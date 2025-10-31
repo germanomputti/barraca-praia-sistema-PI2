@@ -177,21 +177,34 @@ function showModalPedido(p) {
 async function loadProduction() {
   const tbody = document.querySelector('#tabelaPedidos tbody');
   if (!tbody) return;
-  const resp = await fetch(apiBase + '/pedidos?hoje=true');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const resp = await fetch(apiBase + '/pedidos?date=' + today);
   const pedidos = await resp.json();
+
+  // --- carrega lista de IDs ocultos do localStorage
+  const hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
+
   tbody.innerHTML = '';
+
   pedidos.forEach(p => {
+    // se o pedido estiver oculto, pula
+    if (hiddenOrders.includes(p.id)) return;
+
     const tr = document.createElement('tr');
+    tr.setAttribute('data-id', p.id);
     tr.innerHTML = `
       <td>${new Date(p.data_hora).toLocaleString('pt-BR')}</td>
       <td>${p.numero_mesa}</td>
       <td>${p.cliente}</td>
-      <td>${(p.items || []).map(i => `${i.product_name} (${i.option_name}) x${i.quantidade}`).join('<br>')}</td>
+      <td>${p.items.map(it => `${it.product_name} (${it.option_name}) x${it.quantidade}`).join('<br>')}</td>
       <td>${p.status}</td>
       <td>
-        ${p.status === 'Aguardando' ? `<button class="btn" onclick="updateStatus(${p.id},'Em produção')">Iniciar</button>` : ''}
-        ${p.status === 'Em produção' ? `<button class="btn alt" onclick="updateStatus(${p.id},'Concluído')">Finalizar</button>` : ''}
-      </td>`;
+        <button class="btn" onclick="updateStatus(${p.id}, 'Em produção')">Iniciar</button>
+        <button class="btn alt" onclick="updateStatus(${p.id}, 'Concluído')">Finalizar</button>
+        <button class="btn danger" onclick="removeFromView(${p.id})">Excluir</button>
+      </td>
+    `;
     tbody.appendChild(tr);
   });
 }
@@ -257,6 +270,24 @@ async function updateStatus(id, status) {
   loadProduction();
 }
 
+// --------------------------------------------------
+// REMOVE PEDIDO DA VISUALIZAÇÃO (com persistência local)
+// --------------------------------------------------
+function removeFromView(id) {
+  // remove do DOM
+  const row = document.querySelector(`#tabelaPedidos tr[data-id="${id}"]`);
+  if (row) row.remove();
+
+  // salva no localStorage
+  let hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
+  if (!hiddenOrders.includes(id)) {
+    hiddenOrders.push(id);
+    localStorage.setItem('hiddenOrders', JSON.stringify(hiddenOrders));
+  }
+
+  console.log(`🗑️ Pedido ${id} removido da visualização (persistente).`);
+}
+
 // ------------------------------------------------------------
 // 4️⃣ INICIALIZAÇÃO
 // ------------------------------------------------------------
@@ -294,3 +325,12 @@ window.addEventListener('load', () => {
     });
   }
 });
+
+
+
+
+function resetHiddenOrders() {
+  localStorage.removeItem('hiddenOrders');
+  loadProduction();
+  alert("🔁 Todos os pedidos foram restaurados na visualização!");
+}

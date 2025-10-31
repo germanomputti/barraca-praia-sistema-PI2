@@ -162,3 +162,13 @@ header {
   background: #0077b6;
   color: white;
 }
+
+
+.btn.danger {
+  background-color: #e63946;
+  color: white;
+}
+
+.btn.danger:hover {
+  background-color: #d62828;
+}
