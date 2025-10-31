@@ -40,7 +40,8 @@ async function renderProductsGrid() {
 
   Object.keys(grouped).forEach(name => {
     const opts = grouped[name];
-    const img = opts[0].image || 'imagens/placeholder.svg';
+    let img = opts[0].image;
+      if (img && img.endsWith('.svg')) img = img.replace('.svg', '.jpg');
     const card = document.createElement('div');
     card.className = 'item-card';
     card.innerHTML = `<img src="${img}" alt="${name}"><h3>${name}</h3>`;
