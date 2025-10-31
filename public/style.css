@@ -208,6 +208,12 @@ body {
   border-radius: 6px;
   border: 1px solid #ccc;
   font-size: 14px;
+  background: #fff;
+}
+.filtros span {
+  font-weight: 500;
+  margin: 0 6px;
+  color: #333;
 }
 /* ==============================
    ESTILO DO DASHBOARD (Análise)

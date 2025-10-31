@@ -180,7 +180,7 @@ async function loadProduction() {
   const tbody = document.querySelector('#tabelaPedidos tbody');
   if (!tbody) return;
 
-  // --- lê opção(s) selecionadas (multi-select de status) ---
+  // --- lê status selecionados (multi-select) ---
   const filtroEl = document.getElementById('filtroStatus');
   let filtros = [];
   if (filtroEl) {
@@ -190,29 +190,24 @@ async function loadProduction() {
     filtros = ['__ALL__'];
   }
 
-  // --- lê a data selecionada (ou usa hoje como padrão) ---
-  const filtroData = document.getElementById('filtroData');
-  let dataSelecionada = new Date().toISOString().slice(0, 10); // formato YYYY-MM-DD
-  if (filtroData && filtroData.value) {
-    dataSelecionada = filtroData.value;
-  }
+  // --- lê intervalo de datas ---
+  const filtroInicio = document.getElementById('filtroDataInicio');
+  const filtroFim = document.getElementById('filtroDataFim');
 
-  // --- busca pedidos da data selecionada ---
-  const resp = await fetch(apiBase + '/pedidos?date=' + dataSelecionada);
+  let dataInicio = filtroInicio?.value || new Date().toISOString().slice(0, 10);
+  let dataFim = filtroFim?.value || dataInicio; // padrão: mesmo dia
+
+  // busca pedidos entre dataInicio e dataFim
+  const resp = await fetch(apiBase + `/pedidos?start_date=${dataInicio}&end_date=${dataFim}`);
   const pedidos = await resp.json();
 
-  // --- carrega IDs ocultos do localStorage ---
+  // --- IDs ocultos salvos localmente ---
   const hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
-
-  // --- limpa a tabela ---
   tbody.innerHTML = '';
 
-  // --- preenche tabela com filtros aplicados ---
+  // --- preenche tabela filtrada ---
   pedidos.forEach(p => {
-    // ignora se o pedido está oculto
     if (hiddenOrders.includes(p.id)) return;
-
-    // ignora se o status não bate com o(s) filtro(s)
     if (!filtros.includes('__ALL__') && !filtros.includes(p.status)) return;
 
     const tr = document.createElement('tr');
@@ -231,30 +226,29 @@ async function loadProduction() {
       </td>
     `;
 
-    // aplica cor de fundo conforme o status
-    if (p.status === 'Em produção') {
-      tr.classList.add('status-producao');
-    } else if (p.status === 'Concluído') {
-      tr.classList.add('status-concluido');
-    } else {
-      tr.classList.add('status-aguardando');
-    }
+    if (p.status === 'Em produção') tr.classList.add('status-producao');
+    else if (p.status === 'Concluído') tr.classList.add('status-concluido');
+    else tr.classList.add('status-aguardando');
 
     tbody.appendChild(tr);
   });
 
-  // --- mostra mensagem se não houver pedidos ---
+  // --- mensagem se não houver pedidos ---
   if (tbody.innerHTML.trim() === '') {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="6" style="text-align:center; color:#888;">Nenhum pedido encontrado para esta data.</td>`;
+    tr.innerHTML = `<td colspan="6" style="text-align:center; color:#888;">Nenhum pedido encontrado neste período.</td>`;
     tbody.appendChild(tr);
   }
-// Atualiza rótulo de data atual
-const label = document.getElementById('dataSelecionadaLabel');
-if (label) {
-  const dataFmt = new Date(dataSelecionada + 'T00:00').toLocaleDateString('pt-BR');
-  label.textContent = `📅 Pedidos do dia ${dataFmt}`;
-}
+
+  // --- legenda de período mostrado ---
+  const label = document.getElementById('dataSelecionadaLabel');
+  if (label) {
+    const inicioFmt = new Date(dataInicio + 'T00:00').toLocaleDateString('pt-BR');
+    const fimFmt = new Date(dataFim + 'T00:00').toLocaleDateString('pt-BR');
+    label.textContent = dataInicio === dataFim
+      ? `📅 Pedidos do dia ${inicioFmt}`
+      : `📅 Pedidos de ${inicioFmt} a ${fimFmt}`;
+  }
 }
 
 // Registra handlers globais (delegation) — execute uma vez no carregamento da página
@@ -294,8 +288,13 @@ function setupProductionHandlers() {
 // chama setup uma vez quando a página carrega
 document.addEventListener('DOMContentLoaded', () => {
   setupProductionHandlers();
-  const filtroData = document.getElementById('filtroData');
-if (filtroData) filtroData.addEventListener('change', loadProduction);
+['filtroDataInicio', 'filtroDataFim', 'filtroStatus'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', loadProduction);
+});
+
+const btnFiltrar = document.getElementById('btnFiltrar');
+if (btnFiltrar) btnFiltrar.addEventListener('click', loadProduction);
 });
 // --------------------------------------------------
 // FUNÇÃO DE ORDENAÇÃO DA TABELA DE PRODUÇÃO

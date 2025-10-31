@@ -23,7 +23,7 @@
       <h2>Pedidos do dia</h2>
 
       <!-- Filtros -->
-      <div class="filtros">
+     <div class="filtros">
   <label for="filtroStatus"><strong>Status:</strong></label>
   <select id="filtroStatus" multiple size="4">
     <option value="__ALL__" selected>Todos</option>
@@ -32,8 +32,10 @@
     <option value="Concluído">Concluído</option>
   </select>
 
-  <label for="filtroData"><strong>Data:</strong></label>
-  <input type="date" id="filtroData" />
+  <label><strong>Período:</strong></label>
+  <input type="date" id="filtroDataInicio" />
+  <span>até</span>
+  <input type="date" id="filtroDataFim" />
 
   <button class="btn alt" id="btnFiltrar">
     <i class="fas fa-filter"></i> Filtrar
@@ -43,6 +45,8 @@
     <i class="fas fa-eye"></i> Mostrar todos os pedidos
   </button>
 </div>
+
+<p id="dataSelecionadaLabel" style="text-align:center; color:#555; font-weight:500;"></p>
 <p id="dataSelecionadaLabel" style="text-align:center; color:#555; font-weight:500;"></p>
       <!-- Tabela de pedidos -->
       <table id="tabelaPedidos">
