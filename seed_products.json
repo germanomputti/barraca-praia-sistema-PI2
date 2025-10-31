@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Caipirinha",
+    "option_name": "Lim\u00e3o",
+    "price": 15.0,
+    "image": "img/caipirinha_limao.svg"
+  },
+  {
+    "name": "Caipirinha",
+    "option_name": "Morango",
+    "price": 20.0,
+    "image": "img/caipirinha_morango.svg"
+  },
+  {
+    "name": "Caipirinha",
+    "option_name": "Maracuj\u00e1",
+    "price": 20.0,
+    "image": "img/caipirinha_maracuja.svg"
+  },
+  {
+    "name": "\u00c1gua de coco",
+    "option_name": "Sem gelo",
+    "price": 10.0,
+    "image": "img/agua_sem_gelo.svg"
+  },
+  {
+    "name": "\u00c1gua de coco",
+    "option_name": "Com gelo",
+    "price": 12.0,
+    "image": "img/agua_com_gelo.svg"
+  },
+  {
+    "name": "Lanche natural",
+    "option_name": "Frango",
+    "price": 15.0,
+    "image": "img/lanche_frango.svg"
+  },
+  {
+    "name": "Lanche natural",
+    "option_name": "Atum",
+    "price": 17.0,
+    "image": "img/lanche_atum.svg"
+  },
+  {
+    "name": "Batata frita",
+    "option_name": "Simples",
+    "price": 30.0,
+    "image": "img/batata_simples.svg"
+  },
+  {
+    "name": "Batata frita",
+    "option_name": "Com queijo",
+    "price": 45.0,
+    "image": "img/batata_queijo.svg"
+  },
+  {
+    "name": "Pastel",
+    "option_name": "Carne",
+    "price": 15.0,
+    "image": "img/pastel_carne.svg"
+  },
+  {
+    "name": "Pastel",
+    "option_name": "Queijo",
+    "price": 15.0,
+    "image": "img/pastel_queijo.svg"
+  },
+  {
+    "name": "Pastel",
+    "option_name": "Camar\u00e3o",
+    "price": 20.0,
+    "image": "img/pastel_camarao.svg"
+  },
+  {
+    "name": "Salada de frutas",
+    "option_name": "Simples",
+    "price": 15.0,
+    "image": "img/salada_simples.svg"
+  },
+  {
+    "name": "Salada de frutas",
+    "option_name": "Com iogurte",
+    "price": 20.0,
+    "image": "img/salada_iogurte.svg"
+  },
+  {
+    "name": "Refrigerante",
+    "option_name": "Coca-cola",
+    "price": 8.0,
+    "image": "img/ref_coca.svg"
+  },
+  {
+    "name": "Refrigerante",
+    "option_name": "Guaran\u00e1",
+    "price": 8.0,
+    "image": "img/ref_guarana.svg"
+  },
+  {
+    "name": "Refrigerante",
+    "option_name": "Coca-cola zero",
+    "price": 8.0,
+    "image": "img/ref_cocazero.svg"
+  },
+  {
+    "name": "Sorvete",
+    "option_name": "Chocolate",
+    "price": 15.0,
+    "image": "img/sorvete_chocolate.svg"
+  },
+  {
+    "name": "Sorvete",
+    "option_name": "Morango",
+    "price": 15.0,
+    "image": "img/sorvete_morango.svg"
+  }
+]

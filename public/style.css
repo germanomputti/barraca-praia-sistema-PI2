@@ -1,0 +1,164 @@
+
+:root{
+  --bg:#FFF7E6; --primary:#FFB703; --secondary:#00A6FB; --accent:#FF6B6B; --card:#FFF3C4; --muted:#6c6c6c;
+  --container-width:1100px;
+}
+*{box-sizing:border-box}
+body{font-family:Inter, Arial, sans-serif; background:linear-gradient(180deg,var(--bg),#fff); color:#222; margin:0; padding:16px; display:flex; justify-content:center;}
+.header{max-width:var(--container-width); width:100%; margin-bottom:12px; padding:12px; border-radius:8px; background:linear-gradient(90deg,var(--primary),var(--secondary)); color:white; box-shadow:0 4px 10px rgba(0,0,0,0.08);}
+.main-grid{max-width:var(--container-width); width:100%; display:grid; grid-template-columns:1fr 360px; gap:16px;}
+.products-grid{display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:12px;}
+.item-card{background:var(--card); padding:10px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); display:flex; flex-direction:column; align-items:center;}
+.item-card img{width:100%; height:140px; object-fit:cover; border-radius:8px;}
+.item-card h3{margin:8px 0 4px;}
+.select, select{width:100%; margin-bottom:8px;}
+.quant{display:flex; gap:8px; align-items:center;}
+.btn{background:var(--primary); color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;}
+.btn.alt{background:var(--secondary);}
+.cart{background:white; padding:12px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.cart input{width:100%; padding:8px; margin-bottom:8px;}
+#cartList{list-style:none; padding:0; max-height:300px; overflow:auto;}
+.card{background:white; padding:12px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:12px;}
+.table-responsive{overflow:auto;}
+table{width:100%; border-collapse:collapse;}
+th,td{padding:8px; border-bottom:1px solid #eee; text-align:left;}
+.modal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);}
+.modal-content{background:white; padding:16px; border-radius:8px; max-width:90%;}
+.controls{display:flex; gap:8px; align-items:center; margin-bottom:12px;}
+.charts{display:grid; grid-template-columns:1fr; gap:12px;}
+@media(min-width:900px){ .charts{grid-template-columns:1fr 1fr;} .main-grid{grid-template-columns:1fr 360px;} }
+
+
+/* --- Pop-up de confirmação bonito --- */
+.pedido-confirmado {
+  text-align: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  animation: zoomIn 0.3s ease;
+}
+.pedido-confirmado h2 {
+  color: #ff6b6b;
+  margin-bottom: 10px;
+}
+.pedido-confirmado ul {
+  list-style: none;
+  padding: 0;
+}
+@keyframes zoomIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+canvas {
+  max-width: 100%;
+  height: 300px !important;
+  display: block;
+  margin: auto;
+}
+/* ==============================
+   ESTILO DO DASHBOARD (Análise)
+   ============================== */
+
+body {
+  background-color: #f9f9f9;
+  font-family: "Poppins", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background: #ffffff;
+  padding: 20px 0;
+  text-align: center;
+  border-bottom: 2px solid #00a6fb;
+}
+
+.titulo-analise {
+  font-size: 28px;
+  color: #023e8a;
+  margin: 0;
+}
+
+.dashboard {
+  padding: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.filtro-container {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.filtro-container select {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.graficos-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.grafico-card {
+  flex: 1 1 calc(33% - 20px);
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  min-width: 300px;
+}
+
+.grafico-card canvas {
+  width: 100% !important;
+  height: 300px !important;
+}
+
+/* Botão Mostrar histórico */
+.historico-toggle .btn {
+  background-color: #00a6fb;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.historico-toggle .btn:hover {
+  background-color: #0077b6;
+}
+
+/* Esconde tabela por padrão */
+#histTable {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 25px;
+  background: #fff;
+}
+
+#histTable th,
+#histTable td {
+  padding: 12px;
+  vertical-align: top;
+  line-height: 1.4em;
+}
+#histTable th {
+  background: #0077b6;
+  color: white;
+}

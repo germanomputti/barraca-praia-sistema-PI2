@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cardápio - Barraca de Praia</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <header class="header"><h1>Barraca de Praia - Cardápio</h1></header>
+  <main class="main-grid">
+    <section class="menu" aria-label="Produtos">
+      <div id="productsGrid" class="products-grid"></div>
+    </section>
+
+    <aside class="cart" aria-label="Carrinho de pedidos">
+      <h2>Carrinho</h2>
+      <label for="cliente">Nome do cliente</label>
+      <input id="cliente" aria-label="Nome do cliente" />
+      <label for="numero-mesa">Número da mesa</label>
+      <input id="numero-mesa" type="number" aria-label="Número da mesa" />
+      <ul id="cartList"></ul>
+      <p>Total: R$ <span id="cartTotal">0.00</span></p>
+      <button id="sendOrder" class="btn">Enviar pedido</button>
+    </aside>
+  </main>
+
+  <div id="modal" class="modal" role="dialog" aria-modal="true" hidden>
+    <div class="modal-content" id="modalContent"></div>
+    <button id="closeModal" class="btn">Fechar</button>
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>

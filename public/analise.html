@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Dashboard - Barraca de Praia</title>
+  <link rel="stylesheet" href="style.css"/>
+  <!-- Chart.js precisa ser carregado antes do script -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+  <header>
+    <h1 class="titulo-analise">📊 Análise de Vendas — Barraca de Praia</h1>
+  </header>
+
+  <main class="dashboard">
+    <div class="filtro-container">
+      <label for="productFilter">Filtrar produto:</label>
+      <select id="productFilter"></select>
+    </div>
+
+    <div class="graficos-container">
+      <div class="grafico-card">
+        <canvas id="chart1"></canvas>
+      </div>
+      <div class="grafico-card">
+        <canvas id="chart2"></canvas>
+      </div>
+      <div class="grafico-card">
+        <canvas id="chart3"></canvas>
+      </div>
+    </div>
+
+    <div class="historico-toggle" style="text-align:center; margin-top: 20px;">
+      <button id="toggleHistorico" class="btn alt">📋 Mostrar histórico de pedidos</button>
+    </div>
+
+    <table id="histTable">
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Itens pedidos</th>
+      <th>Chuva</th>
+      <th>Temperatura</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+  </main>
+
+  <!-- Importa Chart.js e script de análise -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
