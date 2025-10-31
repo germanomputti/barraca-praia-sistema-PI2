@@ -65,73 +65,142 @@ canvas {
 }
 
 /*estilo producao*/
-/* ==== BOTÕES DE AÇÃO DA TABELA DE PRODUÇÃO ==== */
+/* ======== ESTILO GERAL - PRODUÇÃO ======== */
+body {
+  background: #f7f9fc;
+  font-family: 'Poppins', sans-serif;
+  color: #222;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 
-/* estilo base de botão */
-.btn {
+/* CABEÇALHO */
+.header {
+  text-align: center;
+  background: none;
+  padding: 20px 0;
+  margin: 0;
+  box-shadow: none;
+}
+.header h1 {
+  color: #023047;
+  font-size: 2em;
+  margin: 0;
+  border-bottom: 3px solid #00a6fb;
+  display: inline-block;
+  padding-bottom: 8px;
+}
+
+/* CONTAINER */
+.container {
+  width: 95%;
+  max-width: 1000px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+/* CARD */
+.card h2 {
+  text-align: center;
+  color: #023047;
+}
+
+/* FILTROS */
+.filtros {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.filtros select {
+  min-width: 180px;
+  padding: 5px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+.filtros button {
   padding: 6px 12px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  transition: 0.2s;
+}
+.filtros .btn.alt {
+  background: #0077b6;
+  color: #fff;
+}
+.filtros .btn.alt:hover {
+  background: #0096c7;
+}
+.filtros .btn.danger {
+  background: #d62828;
   color: white;
-  transition: all 0.2s ease-in-out;
+}
+.filtros .btn.danger:hover {
+  background: #e63946;
 }
 
-/* botão iniciar */
+/* TABELA */
+#tabelaPedidos {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  margin-top: 10px;
+}
+#tabelaPedidos th, #tabelaPedidos td {
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+#tabelaPedidos th {
+  background: #f0f0f0;
+  cursor: pointer;
+}
+#tabelaPedidos tr:hover {
+  background: #f8f9fa;
+}
+
+/* STATUS COLORS */
+.status-aguardando {
+  background: #fdfcdc !important;
+}
+.status-producao {
+  background: #e0f7fa !important;
+}
+.status-concluido {
+  background: #e9f5db !important;
+}
+
+/* BOTÕES DA TABELA */
 .btn-start {
-  background-color: #0077b6; /* azul escuro */
+  background: #0077b6;
+  color: white;
 }
 .btn-start:hover {
-  background-color: #0096c7; /* azul mais claro */
+  background: #00b4d8;
 }
-
-/* botão finalizar */
 .btn-finish {
-  background-color: #2a9d8f; /* verde água */
+  background: #2a9d8f;
+  color: white;
 }
 .btn-finish:hover {
-  background-color: #38b000; /* verde vivo */
+  background: #38b000;
 }
-
-/* botão excluir */
 .btn.danger {
-  background-color: #d62828; /* vermelho forte */
+  background: #d62828;
+  color: white;
 }
 .btn.danger:hover {
-  background-color: #e63946; /* vermelho mais claro */
+  background: #e63946;
 }
-
-/* estado desativado (opcional) */
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* ================================
-   ESTILO DAS LINHAS POR STATUS
-   ================================ */
-
-.status-aguardando {
-  background-color: #f9f9f9;
-}
-
-.status-producao {
-  background-color: #fff3cd;
-  border-left: 5px solid #ffcc00;
-}
-
-.status-concluido {
-  background-color: #d4edda;
-  border-left: 5px solid #28a745;
-}
-
-/* Suaviza a transição visual ao mudar status */
-#tabelaPedidos tr {
-  transition: background-color 0.4s ease, border-left 0.3s ease;
-}
-
-
 /* ==============================
    ESTILO DO DASHBOARD (Análise)
    ============================== */
