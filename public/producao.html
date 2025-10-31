@@ -7,14 +7,22 @@
   <main>
     <div class="card">
       <h2>Pedidos do dia</h2>
-      <button class="btn" onclick="resetHiddenOrders()">Mostrar todos os pedidos</button>
-      <table id="tabelaPedidos">
+<div class="filtros">
+  <label for="filtroStatus"><strong>Filtrar por status:</strong></label>
+<select id="filtroStatus" multiple size="4">
+  <option value="__ALL__" selected>Todos</option>
+  <option value="Aguardando">Aguardando</option>
+  <option value="Em produção">Em produção</option>
+  <option value="Concluído">Concluído</option>
+</select>
+
+  <button class="btn" onclick="resetHiddenOrders()">Mostrar todos os pedidos</button>
+</div>      <table id="tabelaPedidos">
   <thead>
     <tr>
       <th onclick="sortTable('hora')">🕓 Hora do Pedido ⬍</th>
       <th onclick="sortTable('mesa')">🍽️ Mesa ⬍</th>
       <th onclick="sortTable('cliente')"> Cliente ⬍</th>
-      <th>Cliente</th>
       <th>Itens</th>
       <th>Status</th>
       <th>Ações</th>

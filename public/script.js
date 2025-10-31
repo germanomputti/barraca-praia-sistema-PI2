@@ -170,45 +170,110 @@ function showModalPedido(p) {
     document.getElementById('numero-mesa').value = '';
   };
 }
-
-// ------------------------------------------------------------
-// 3️⃣ TELA DE PRODUÇÃO
-// ------------------------------------------------------------
+// --------------------------------------------------
+// TELA DE PRODUÇÃO (com filtro e persistência local)
+// --------------------------------------------------
+// --------------------------------------------------
+// TELA DE PRODUÇÃO (com filtro múltiplo, persistência e cores)
+// --------------------------------------------------
 async function loadProduction() {
   const tbody = document.querySelector('#tabelaPedidos tbody');
   if (!tbody) return;
+
+  // lê opção(s) selecionadas (multi-select)
+  const filtroEl = document.getElementById('filtroStatus');
+  let filtros = [];
+  if (filtroEl) {
+    const selected = [...filtroEl.selectedOptions].map(opt => opt.value);
+    filtros = selected.length > 0 ? selected : ['__ALL__'];
+  } else {
+    filtros = ['__ALL__'];
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const resp = await fetch(apiBase + '/pedidos?date=' + today);
   const pedidos = await resp.json();
 
-  // --- carrega lista de IDs ocultos do localStorage
+  // carrega IDs ocultos do localStorage
   const hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
 
   tbody.innerHTML = '';
 
   pedidos.forEach(p => {
-    // se o pedido estiver oculto, pula
+    // ignora se o pedido está oculto
     if (hiddenOrders.includes(p.id)) return;
+
+    // ignora se o status não bate com o(s) filtro(s) selecionado(s)
+    if (!filtros.includes('__ALL__') && !filtros.includes(p.status)) return;
 
     const tr = document.createElement('tr');
     tr.setAttribute('data-id', p.id);
+
+    // monta o conteúdo da linha
     tr.innerHTML = `
       <td>${new Date(p.data_hora).toLocaleString('pt-BR')}</td>
       <td>${p.numero_mesa}</td>
-      <td>${p.cliente}</td>
-      <td>${p.items.map(it => `${it.product_name} (${it.option_name}) x${it.quantidade}`).join('<br>')}</td>
+      <td>${p.cliente || ''}</td>
+      <td>${(p.items || []).map(it => `${it.product_name} (${it.option_name}) x${it.quantidade}`).join('<br>')}</td>
       <td>${p.status}</td>
       <td>
-        <button class="btn" onclick="updateStatus(${p.id}, 'Em produção')">Iniciar</button>
-        <button class="btn alt" onclick="updateStatus(${p.id}, 'Concluído')">Finalizar</button>
-        <button class="btn danger" onclick="removeFromView(${p.id})">Excluir</button>
+        <button class="btn btn-start" data-id="${p.id}">Iniciar</button>
+        <button class="btn btn-finish" data-id="${p.id}">Finalizar</button>
+        <button class="btn danger" data-id="${p.id}">Excluir</button>
       </td>
     `;
+
+    // aplica cor de fundo conforme o status (fora do template string)
+    if (p.status === 'Em produção') {
+      tr.classList.add('status-producao');
+    } else if (p.status === 'Concluído') {
+      tr.classList.add('status-concluido');
+    } else {
+      tr.classList.add('status-aguardando');
+    }
+
     tbody.appendChild(tr);
   });
 }
 
+// Registra handlers globais (delegation) — execute uma vez no carregamento da página
+function setupProductionHandlers() {
+  // filtrar ao mudar seleção
+  const filtroEl = document.getElementById('filtroStatus');
+  if (filtroEl) filtroEl.addEventListener('change', loadProduction);
+
+  // botão opcional de filtrar (se existir)
+  const btnFiltrar = document.getElementById('btnFiltrar');
+  if (btnFiltrar) btnFiltrar.addEventListener('click', loadProduction);
+
+  // delegação de eventos para os botões da tabela (mais robusto que onclick inline)
+  document.getElementById('tabelaPedidos')?.addEventListener('click', function (e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const row = btn.closest('tr');
+    const id = row?.dataset?.id ? Number(row.dataset.id) : null;
+    if (!id) return;
+
+    if (btn.classList.contains('danger')) {
+      // excluir (persistente localmente)
+      removeFromView(id);
+      return;
+    }
+    if (btn.classList.contains('btn-start')) {
+      updateStatus(id, 'Em produção');
+      return;
+    }
+    if (btn.classList.contains('btn-finish')) {
+      updateStatus(id, 'Concluído');
+      return;
+    }
+  });
+}
+
+// chama setup uma vez quando a página carrega
+document.addEventListener('DOMContentLoaded', () => {
+  setupProductionHandlers();
+});
 // --------------------------------------------------
 // FUNÇÃO DE ORDENAÇÃO DA TABELA DE PRODUÇÃO
 // --------------------------------------------------
@@ -325,7 +390,6 @@ window.addEventListener('load', () => {
     });
   }
 });
-
 
 
 
