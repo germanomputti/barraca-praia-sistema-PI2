@@ -194,18 +194,31 @@ async function loadProduction() {
   const filtroInicio = document.getElementById('filtroDataInicio');
   const filtroFim = document.getElementById('filtroDataFim');
 
+  // formato YYYY-MM-DD
   let dataInicio = filtroInicio?.value || new Date().toISOString().slice(0, 10);
   let dataFim = filtroFim?.value || dataInicio; // padrão: mesmo dia
 
-  // busca pedidos entre dataInicio e dataFim
-  const resp = await fetch(apiBase + `/pedidos?start_date=${dataInicio}&end_date=${dataFim}`);
-  const pedidos = await resp.json();
+  // --- pega todos os pedidos DO BACKEND (sem depender do filtro do servidor) ---
+  const resp = await fetch(apiBase + '/pedidos'); // pega tudo
+  let pedidos = await resp.json();
+
+  // --- filtra no front-end pelo intervalo de datas (inclusivo) ---
+  // Normalizamos comparando strings YYYY-MM-DD (data_hora começa com ISO) 
+  const start = dataInicio;
+  const end = dataFim;
+
+  pedidos = pedidos.filter(p => {
+    if (!p.data_hora) return false;
+    const day = p.data_hora.slice(0, 10); // 'YYYY-MM-DD'
+    return (day >= start && day <= end);
+  });
 
   // --- IDs ocultos salvos localmente ---
   const hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
+
   tbody.innerHTML = '';
 
-  // --- preenche tabela filtrada ---
+  // --- preenche tabela filtrada (aplicando também filtro de status) ---
   pedidos.forEach(p => {
     if (hiddenOrders.includes(p.id)) return;
     if (!filtros.includes('__ALL__') && !filtros.includes(p.status)) return;
