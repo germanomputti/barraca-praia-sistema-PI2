@@ -180,7 +180,7 @@ async function loadProduction() {
   const tbody = document.querySelector('#tabelaPedidos tbody');
   if (!tbody) return;
 
-  // lê opção(s) selecionadas (multi-select)
+  // --- lê opção(s) selecionadas (multi-select de status) ---
   const filtroEl = document.getElementById('filtroStatus');
   let filtros = [];
   if (filtroEl) {
@@ -190,26 +190,34 @@ async function loadProduction() {
     filtros = ['__ALL__'];
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const resp = await fetch(apiBase + '/pedidos?date=' + today);
+  // --- lê a data selecionada (ou usa hoje como padrão) ---
+  const filtroData = document.getElementById('filtroData');
+  let dataSelecionada = new Date().toISOString().slice(0, 10); // formato YYYY-MM-DD
+  if (filtroData && filtroData.value) {
+    dataSelecionada = filtroData.value;
+  }
+
+  // --- busca pedidos da data selecionada ---
+  const resp = await fetch(apiBase + '/pedidos?date=' + dataSelecionada);
   const pedidos = await resp.json();
 
-  // carrega IDs ocultos do localStorage
+  // --- carrega IDs ocultos do localStorage ---
   const hiddenOrders = JSON.parse(localStorage.getItem('hiddenOrders') || '[]');
 
+  // --- limpa a tabela ---
   tbody.innerHTML = '';
 
+  // --- preenche tabela com filtros aplicados ---
   pedidos.forEach(p => {
     // ignora se o pedido está oculto
     if (hiddenOrders.includes(p.id)) return;
 
-    // ignora se o status não bate com o(s) filtro(s) selecionado(s)
+    // ignora se o status não bate com o(s) filtro(s)
     if (!filtros.includes('__ALL__') && !filtros.includes(p.status)) return;
 
     const tr = document.createElement('tr');
     tr.setAttribute('data-id', p.id);
 
-    // monta o conteúdo da linha
     tr.innerHTML = `
       <td>${new Date(p.data_hora).toLocaleString('pt-BR')}</td>
       <td>${p.numero_mesa}</td>
@@ -223,7 +231,7 @@ async function loadProduction() {
       </td>
     `;
 
-    // aplica cor de fundo conforme o status (fora do template string)
+    // aplica cor de fundo conforme o status
     if (p.status === 'Em produção') {
       tr.classList.add('status-producao');
     } else if (p.status === 'Concluído') {
@@ -234,6 +242,19 @@ async function loadProduction() {
 
     tbody.appendChild(tr);
   });
+
+  // --- mostra mensagem se não houver pedidos ---
+  if (tbody.innerHTML.trim() === '') {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="6" style="text-align:center; color:#888;">Nenhum pedido encontrado para esta data.</td>`;
+    tbody.appendChild(tr);
+  }
+// Atualiza rótulo de data atual
+const label = document.getElementById('dataSelecionadaLabel');
+if (label) {
+  const dataFmt = new Date(dataSelecionada + 'T00:00').toLocaleDateString('pt-BR');
+  label.textContent = `📅 Pedidos do dia ${dataFmt}`;
+}
 }
 
 // Registra handlers globais (delegation) — execute uma vez no carregamento da página
@@ -273,6 +294,8 @@ function setupProductionHandlers() {
 // chama setup uma vez quando a página carrega
 document.addEventListener('DOMContentLoaded', () => {
   setupProductionHandlers();
+  const filtroData = document.getElementById('filtroData');
+if (filtroData) filtroData.addEventListener('change', loadProduction);
 });
 // --------------------------------------------------
 // FUNÇÃO DE ORDENAÇÃO DA TABELA DE PRODUÇÃO

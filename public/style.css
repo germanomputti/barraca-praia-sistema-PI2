@@ -201,6 +201,14 @@ body {
 .btn.danger:hover {
   background: #e63946;
 }
+
+
+.filtros input[type="date"] {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
 /* ==============================
    ESTILO DO DASHBOARD (Análise)
    ============================== */
