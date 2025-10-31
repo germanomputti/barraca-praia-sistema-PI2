@@ -196,6 +196,58 @@ async function loadProduction() {
   });
 }
 
+// --------------------------------------------------
+// FUNÇÃO DE ORDENAÇÃO DA TABELA DE PRODUÇÃO
+// --------------------------------------------------
+let currentSort = { column: null, asc: true };
+
+function sortTable(column) {
+  const tbody = document.querySelector('#tabelaPedidos tbody');
+  if (!tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (rows.length === 0) return;
+
+  // Define a função de comparação
+  let compare;
+  if (column === 'mesa') {
+    compare = (a, b) => {
+      const valA = parseInt(a.children[1].textContent.trim()) || 0;
+      const valB = parseInt(b.children[1].textContent.trim()) || 0;
+      return valA - valB;
+    };
+  } else if (column === 'hora') {
+    compare = (a, b) => {
+      const dateA = new Date(a.children[0].textContent.trim());
+      const dateB = new Date(b.children[0].textContent.trim());
+      return dateA - dateB;
+    };
+  } else if (column === 'cliente') {
+    compare = (a, b) => {
+      const dateA = new Date(a.children[0].textContent.trim());
+      const dateB = new Date(b.children[0].textContent.trim());
+      return dateA - dateB;
+    };
+  }
+
+
+  
+
+  // Alterna a direção da ordenação (ASC / DESC)
+  if (currentSort.column === column) currentSort.asc = !currentSort.asc;
+  else {
+    currentSort.column = column;
+    currentSort.asc = true;
+  }
+
+  rows.sort(compare);
+  if (!currentSort.asc) rows.reverse();
+
+  // Atualiza o DOM
+  tbody.innerHTML = '';
+  rows.forEach(r => tbody.appendChild(r));
+}
+
 async function updateStatus(id, status) {
   await fetch(apiBase + '/pedidos/' + id + '/status', {
     method: 'PUT',
