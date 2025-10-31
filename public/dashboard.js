@@ -49,11 +49,16 @@ async function loadAnalysis() {
     // 🔹 Cria seletor de produtos dinamicamente
     // ========================================================
     const pf = document.getElementById('productFilter');
-    if (pf) {
+    if (!pf) {
+      console.error("❌ Elemento #productFilter não encontrado no DOM!");
+    } else {
       const produtos = await fetchProductsForAnalysis();
+      console.log("📦 Produtos retornados:", produtos);
 
-      pf.innerHTML = '<option value="__ALL__">Todos os produtos</option>';
-      const nomesUnicos = [...new Set(produtos.map(p => p.name))];
+      pf.innerHTML = '<option value="__ALL__" selected>Todos os produtos</option>';
+
+      const nomesUnicos = [...new Set(produtos.map(p => p.name))].sort();
+      console.log("🧾 Nomes únicos:", nomesUnicos);
 
       nomesUnicos.forEach(nome => {
         const opt = document.createElement('option');
@@ -62,8 +67,12 @@ async function loadAnalysis() {
         pf.appendChild(opt);
       });
 
-      // Atualiza gráficos ao mudar o filtro
-      pf.onchange = () => renderCharts(pedidos);
+      // 🔹 Atualiza gráficos ao trocar o filtro
+      pf.addEventListener('change', () => {
+        const produtoSelecionado = pf.value;
+        console.log("🎯 Produto selecionado:", produtoSelecionado);
+        renderCharts(pedidos, produtoSelecionado);
+      });
     }
 
     // ========================================================
@@ -72,66 +81,60 @@ async function loadAnalysis() {
     renderCharts(pedidos);
 
     // ========================================================
-    // 🔹 Preenche tabela de histórico
+    // 🔹 Preenche tabela de histórico agregada por dia
     // ========================================================
-    // ============================================================
-// 📅 Novo formato: uma linha por dia, agregando todos os pedidos
-// ============================================================
-const tbody = document.querySelector('#histTable tbody');
-if (tbody) {
-  tbody.innerHTML = '';
+    const tbody = document.querySelector('#histTable tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
 
-  // Agrupa pedidos por data (AAAA-MM-DD)
-  const groupedByDate = {};
-  pedidos.forEach(p => {
-    const data = p.data_hora.slice(0, 10);
-    groupedByDate[data] = groupedByDate[data] || [];
-    groupedByDate[data].push(p);
-  });
-
-  // Monta uma linha por dia
-  Object.keys(groupedByDate)
-    .sort()
-    .forEach(data => {
-      const pedidosDoDia = groupedByDate[data];
-
-      // Cria um mapa para somar quantidades dos mesmos produtos
-      const produtosResumo = {};
-      pedidosDoDia.forEach(p => {
-        (p.items || []).forEach(it => {
-          const key = `${it.product_name} (${it.option_name})`;
-          produtosResumo[key] = (produtosResumo[key] || 0) + it.quantidade;
-        });
+      const groupedByDate = {};
+      pedidos.forEach(p => {
+        const data = p.data_hora.slice(0, 10);
+        groupedByDate[data] = groupedByDate[data] || [];
+        groupedByDate[data].push(p);
       });
 
-      // Pega categorias do primeiro pedido (são iguais no dia)
-      const catChuva = pedidosDoDia[0].chuva_categoria || '-';
-      const catTemp = pedidosDoDia[0].temp_categoria || '-';
+      Object.keys(groupedByDate)
+        .sort()
+        .forEach(data => {
+          const pedidosDoDia = groupedByDate[data];
+          const produtosResumo = {};
 
-      // Cria linha da tabela
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${new Date(data).toLocaleDateString('pt-BR')}</td>
-        <td>${Object.entries(produtosResumo)
-          .map(([nome, qtd]) => `${nome} x${qtd}`)
-          .join('<br>')}</td>
-        <td>${catChuva}</td>
-        <td>${catTemp}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-}
+          pedidosDoDia.forEach(p => {
+            (p.items || []).forEach(it => {
+              const key = `${it.product_name} (${it.option_name})`;
+              produtosResumo[key] = (produtosResumo[key] || 0) + it.quantidade;
+            });
+          });
+
+          const catChuva = pedidosDoDia[0].chuva_categoria || '-';
+          const catTemp = pedidosDoDia[0].temp_categoria || '-';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${new Date(data).toLocaleDateString('pt-BR')}</td>
+            <td>${Object.entries(produtosResumo)
+              .map(([nome, qtd]) => `${nome} x${qtd}`)
+              .join('<br>')}</td>
+            <td>${catChuva}</td>
+            <td>${catTemp}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+    }
+
   } catch (e) {
     logDebug("❌ Erro ao carregar análise: " + e.message);
   }
 }
-
 // Função que cria os 3 gráficos principais
-function renderCharts(pedidos) {
+
+
+  function renderCharts(pedidos, selectedProduct = null) {
   logDebug("🎨 Renderizando gráficos...");
 
-  const productSel = document.getElementById("productFilter")?.value || "__ALL__";
-
+  // Usa o valor do seletor ou o que for passado via argumento
+  const productSel = selectedProduct || document.getElementById("productFilter")?.value || "__ALL__";
   // ========== 1️⃣ VENDAS POR MÊS ==========
   const byMonth = {};
   pedidos.forEach(p => {
@@ -229,8 +232,14 @@ window.addEventListener('load', () => {
 });
 
 
-// Executa ao carregar a página
-window.addEventListener('load', async () => {
-  logDebug("✅ Página de análise carregada.");
-  setTimeout(loadAnalysis, 1000);
+// ============================================================
+// 🚀 Inicialização garantida após o DOM carregar
+// ============================================================
+window.addEventListener('DOMContentLoaded', async () => {
+  logDebug("✅ Página de análise carregada (DOM completamente pronto).");
+
+  // Aguarda levemente para garantir que Chart.js esteja disponível
+  setTimeout(async () => {
+    await loadAnalysis();
+  }, 800);
 });
