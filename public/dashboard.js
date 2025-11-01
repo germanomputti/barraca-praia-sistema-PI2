@@ -525,53 +525,45 @@ function showHoverPopupDetailed(titulo, categoria, pedidos, tipo, clientX, clien
     hoverPopupTimer = null;
   }
 
-  // 🔹 Define o conjunto de pedidos usados
-  let filtrados = [];
-  if (Array.isArray(pedidos) && pedidos.length > 0) {
-    // Caso "mês": já vem filtrado no parâmetro
-    filtrados = pedidos;
-  } else {
-    // Caso chuva/temperatura: filtra globalmente
-    filtrados = pedidosGlobais || [];
-    filtrados = filtrados.filter(p => {
-      const produtoOK =
-        productSel === "__ALL__" ||
-        (p.items || []).some(it => it.product_name === productSel);
-      if (!produtoOK) return false;
-      if (tipo === "chuva")
-        return (p.chuva_categoria || "Sem dado") === categoria;
-      if (tipo === "temperatura")
-        return (p.temp_categoria || "Sem dado") === categoria;
-      return true;
-    });
+  // --- obtém base de pedidos: pode ser array passado, ou usa pedidosGlobais como fallback
+  let base = Array.isArray(pedidos) ? pedidos.slice() : (Array.isArray(pedidosGlobais) ? pedidosGlobais.slice() : []);
+
+  // --- aplica filtro por categoria quando necessário (mes/chuva/temperatura)
+  if (tipo === "mes") {
+    // se categoria for mês (string ou index), já foi tratado pelo chamador — assume base já contém apenas esse mês
+    // não faz nada adicional aqui
+  } else if (tipo === "chuva") {
+    base = base.filter(p => (p.chuva_categoria || "Sem dado") === categoria);
+  } else if (tipo === "temperatura") {
+    base = base.filter(p => (p.temp_categoria || "Sem dado") === categoria);
+  } else if (tipo === "linha") {
+    // caso especial: chamador passou pedidosFiltradosAno e categoria é nome do mês, mas chamador já filtrou
   }
 
-  // 🔹 Calcula total de pedidos de acordo com o filtro ativo
-let totalPedidos = 0;
-if (productSel === "__ALL__") {
-  totalPedidos = filtrados.length;
-} else {
-  // conta apenas pedidos que contêm o produto selecionado
-  totalPedidos = filtrados.filter(p =>
-    (p.items || []).some(it => it.product_name === productSel)
-  ).length;
-}
+  // --- aplica filtro de produto (se houver)
+  const produtoSelecionado = productSel || document.getElementById("productFilter")?.value || "__ALL__";
+  const baseComProduto = produtoSelecionado === "__ALL__"
+    ? base
+    : base.filter(p => (p.items || []).some(it => it.product_name === produtoSelecionado));
 
-  // 🔹 Monta resumo por produto (respeitando productSel)
+  // --- total de pedidos: conta pedidos que contêm o produto selecionado (ou todos, se __ALL__)
+  const totalPedidos = baseComProduto.length;
+
+  // --- monta resumo por subtipo (product + option)
   const resumo = {};
-  filtrados.forEach(p => {
+  baseComProduto.forEach(p => {
     (p.items || []).forEach(it => {
-      if (productSel !== "__ALL__" && it.product_name !== productSel) return;
+      if (produtoSelecionado !== "__ALL__" && it.product_name !== produtoSelecionado) return;
       const key = `${it.product_name} (${it.option_name})`;
-      resumo[key] = (resumo[key] || 0) + it.quantidade;
+      resumo[key] = (resumo[key] || 0) + (it.quantidade || 0);
     });
   });
 
-  const resumoHTML =
-    Object.entries(resumo)
-      .map(([k, v]) => `<li>${k}: <strong>${v}</strong></li>`)
-      .join("") || "<li>Nenhum item</li>";
+  const resumoHTML = Object.entries(resumo)
+    .map(([k, v]) => `<li>${k}: <strong>${v}</strong></li>`)
+    .join("") || "<li>Nenhum item</li>";
 
+  // cria ou reutiliza elemento popup
   if (!hoverPopupEl) {
     hoverPopupEl = document.createElement("div");
     hoverPopupEl.className = "hover-popup-detalhe";
@@ -586,25 +578,25 @@ if (productSel === "__ALL__") {
     <ul style="margin:0; padding-left:14px;">${resumoHTML}</ul>
   `;
 
-  // 🔹 Posiciona popup
+  // posiciona popup (mesma lógica que já tinha)
   const pad = 12;
-  const maxWidth = 320;
+  const maxWidth = 360;
   hoverPopupEl.style.display = "block";
   hoverPopupEl.style.opacity = "1";
   hoverPopupEl.style.maxWidth = maxWidth + "px";
 
   const pageW = window.innerWidth;
   const pageH = window.innerHeight;
-  let left = clientX + pad;
-  let top = clientY - 30;
-  if (left + maxWidth + 10 > pageW) left = clientX - maxWidth - pad;
+  let left = (clientX != null) ? clientX + pad : (pageW / 2 - maxWidth / 2);
+  let top = (clientY != null) ? clientY - 30 : (pageH / 2 - 80);
+  if (left + maxWidth + 10 > pageW) left = (clientX != null) ? clientX - maxWidth - pad : pageW - maxWidth - 10;
   if (top + 150 > pageH) top = pageH - 170;
   if (top < 10) top = 10;
 
   hoverPopupEl.style.left = left + "px";
   hoverPopupEl.style.top = top + "px";
 
-  // fecha popup se mouse sair da janela
+  // segurança extra: fecha popup se mouse sair da janela
   window.onmouseleave = () => hideHoverPopupDetailed();
 }
 
