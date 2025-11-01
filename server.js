@@ -95,10 +95,8 @@ async function getClimaForDate(dateStr) {
   const existing = await pool.query("SELECT * FROM clima WHERE date = $1", [dateStr]);
   if (existing.rows.length > 0) return existing.rows[0];
 
-  // corrige deslocamento
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() - 1);
-  const dataCorrigida = d.toISOString().slice(0, 10);
+  // não corrige mais nada — usa a data exata do pedido
+  const dataCorrigida = dateStr;
 
   const lat = -24.00;
   const lon = -46.41;
@@ -135,7 +133,6 @@ async function getClimaForDate(dateStr) {
     return null;
   }
 }
-
 app.get('/api/clima/:date', async (req,res) => {
   const date = req.params.date;
   try {
@@ -201,6 +198,8 @@ app.post('/api/pedidos', async (req,res) => {
     const data_hora = new Date().toISOString();
     const dataDia = data_hora.slice(0,10);
 
+    // 🔹 GARANTE QUE O CLIMA DO DIA EXISTE NO BANCO
+await getClimaForDate(dataDia);
     // clima do dia (já existe porque seed já fez)
     const clima = await pool.query(`SELECT id FROM clima WHERE date=$1`, [dataDia]);
     const clima_id = clima.rows[0]?.id || null;

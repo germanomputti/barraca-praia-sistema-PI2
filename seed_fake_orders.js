@@ -71,7 +71,7 @@ async function getClimateData() {
 // ✅ CORRIGIDO: recua um dia (Open-Meteo associa ao dia de término)
 const clima = dados.daily.time.map((data, i) => {
   const d = new Date(data);
-  d.setDate(d.getDate() + 1); // 🔹 corrige deslocamento
+ //d.setDate(d.getDate() + 1); // 🔹 corrige deslocamento - nao precisa mais
   const dataCorrigida = d.toISOString().slice(0, 10);
 
   return {

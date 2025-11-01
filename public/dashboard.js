@@ -147,16 +147,17 @@ if (tbody) {
       const catChuva = pedidosDoDia[0].chuva_categoria || '-';
       const catTemp = pedidosDoDia[0].temp_categoria || '-';
 
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${new Date(data).toLocaleDateString('pt-BR')}</td>
-        <td>${Object.entries(produtosResumo)
-          .map(([nome, qtd]) => `${nome} x${qtd}`)
-          .join('<br>')}</td>
-        <td>${catChuva}</td>
-        <td>${catTemp}</td>
-      `;
-      tbody.appendChild(tr);
+      const [y, m, d] = data.split('-').map(Number);
+const dtLocal = new Date(y, m - 1, d);
+
+const tr = document.createElement('tr');
+tr.innerHTML = `
+  <td>${dtLocal.toLocaleDateString('pt-BR')}</td>
+  <td>${Object.entries(produtosResumo).map(([nome, qtd]) => `${nome} x${qtd}`).join('<br>')}</td>
+  <td>${catChuva}</td>
+  <td>${catTemp}</td>
+`;
+tbody.appendChild(tr);
     });
 
   console.log(`✅ Histórico preenchido com ${Object.keys(groupedByDate).length} dias.`);
