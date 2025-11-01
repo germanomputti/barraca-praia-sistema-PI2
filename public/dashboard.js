@@ -76,6 +76,27 @@ async function loadAnalysis() {
     }
 
     // ========================================================
+// 🔹 Cria seletor de ano dinamicamente
+// ========================================================
+const yearSelect = document.getElementById("yearFilter");
+if (yearSelect) {
+  const anosUnicos = [
+    ...new Set(pedidos.map(p => new Date(p.data_hora).getFullYear()))
+  ].sort((a, b) => b - a); // ordena decrescente
+
+  // Limpa e recria opções
+  yearSelect.innerHTML = '<option value="__ALL__">Todos os anos</option>';
+  anosUnicos.forEach(ano => {
+    const opt = document.createElement("option");
+    opt.value = ano;
+    opt.textContent = ano;
+    yearSelect.appendChild(opt);
+  });
+
+  // Atualiza gráficos ao trocar o ano
+  yearSelect.onchange = () => renderCharts(pedidos);
+}
+    // ========================================================
     // 🔹 Renderiza os gráficos
     // ========================================================
     renderCharts(pedidos);
@@ -88,7 +109,7 @@ async function loadAnalysis() {
       tbody.innerHTML = '';
 
       const groupedByDate = {};
-      pedidos.forEach(p => {
+      pedidosFiltrados.forEach(p => {
         const data = p.data_hora.slice(0, 10);
         groupedByDate[data] = groupedByDate[data] || [];
         groupedByDate[data].push(p);
@@ -130,115 +151,158 @@ async function loadAnalysis() {
 // Função que cria os 3 gráficos principais
 
 
-  function renderCharts(pedidos, selectedProduct = null) {
+function renderCharts(pedidos) {
   logDebug("🎨 Renderizando gráficos...");
 
-  // Usa o valor do seletor ou o que for passado via argumento
-  const productSel = selectedProduct || document.getElementById("productFilter")?.value || "__ALL__";
-  
-// ========== 1️⃣ VENDAS POR MÊS (AGRUPANDO POR NOME DO MÊS) ==========
-const byMonth = {};
-const mesesNomes = [
-  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+  // 🧠 Lê seletores
+  const productSel = document.getElementById("productFilter")?.value || "__ALL__";
+  const yearSel = document.getElementById("yearFilter")?.value || "__ALL__";
+
+  // 🔍 Aplica filtros de produto e ano
+  const pedidosFiltrados = pedidos.filter(p => {
+    const ano = new Date(p.data_hora).getFullYear();
+    const produtoOk =
+      productSel === "__ALL__" ||
+      (p.items || []).some(i => i.product_name === productSel);
+    const anoOk = yearSel === "__ALL__" || ano.toString() === yearSel;
+    return produtoOk && anoOk;
+  });
+
+  // 🚨 Caso não haja dados após o filtro
+  if (!pedidosFiltrados.length) {
+    logDebug("⚠️ Nenhum pedido encontrado com os filtros atuais.");
+    const ctxs = ["chart1", "chart2", "chart3"];
+    ctxs.forEach(id => {
+      const c = document.getElementById(id)?.getContext("2d");
+      if (c) {
+        c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+        c.font = "16px Arial";
+        c.fillStyle = "#666";
+        c.fillText("Nenhum dado para exibir", 30, 50);
+      }
+    });
+    return;
+  }
+
+  // ========== 1️⃣ VENDAS POR MÊS ==========
+  // ---------- substitua o bloco do chart1 por este ----------
+const mesesNome = [
+  "Jan","Fev","Mar","Abr","Mai","Jun",
+  "Jul","Ago","Set","Out","Nov","Dez"
 ];
 
-pedidos.forEach(p => {
-  if (!p.data_hora) return;
-  const date = new Date(p.data_hora);
-  const mesNome = mesesNomes[date.getMonth()]; // converte número em nome
+// monta byMonth usando apenas pedidosFiltrados
+const byMonth = {};
+pedidosFiltrados.forEach(p => {
+  const dt = new Date(p.data_hora);
+  const mesIdx = dt.getMonth(); // 0..11
   (p.items || []).forEach(it => {
     if (productSel === "__ALL__" || it.product_name === productSel) {
-      byMonth[mesNome] = (byMonth[mesNome] || 0) + (it.quantidade || 0);
+      byMonth[mesIdx] = (byMonth[mesIdx] || 0) + (it.quantidade || 0);
     }
   });
 });
 
-// Ordena os meses na ordem correta
-const labels1 = mesesNomes.filter(m => byMonth[m]);
-const data1 = labels1.map(m => byMonth[m]);
-// ---------- criação/atualização do chart1 (LINHA) ----------
-const ctx1Elem = document.getElementById("chart1");
-const ctx1 = ctx1Elem?.getContext("2d");
+// transforma em arrays ordenadas por mês (0..11)
+const monthKeys = Object.keys(byMonth).map(k => Number(k)).sort((a,b)=>a-b);
+const labels1 = monthKeys.map(m => mesesNome[m]);
+const data1 = monthKeys.map(m => byMonth[m]);
 
+const ctx1 = document.getElementById("chart1")?.getContext("2d");
 if (ctx1) {
-  // destrói se existir
   if (window.chart1 && typeof window.chart1.destroy === "function") {
-    try { window.chart1.destroy(); } catch(e) { console.warn("destroy chart1:", e); }
+    try { window.chart1.destroy(); } catch(e){console.warn(e)}
   }
 
-  // produto selecionado (para label)
-  const productSel = document.getElementById("productFilter")?.value || "__ALL__";
-  const nomeProduto = productSel === "__ALL__" ? "Todos os produtos" : productSel;
-
-  // cria gráfico com interação e maiores áreas de clique
   window.chart1 = new Chart(ctx1, {
     type: "line",
     data: {
       labels: labels1,
       datasets: [{
-        label: nomeProduto,
+        label: productSel === "__ALL__" ? "Todos os produtos" : productSel,
         data: data1,
+        fill: false,
         borderColor: "#0077B6",
-        backgroundColor: "rgba(0,119,182,0.15)",
-        fill: true,
-        tension: 0.3,
-        pointBackgroundColor: "#023E8A",
-        pointRadius: 6,        // aumenta ponto (visível)
+        backgroundColor: "#0077B6",
+        tension: 0.25,
+        pointRadius: 6,
         pointHoverRadius: 9,
-        // importante: hit radius para facilitar clique
-        pointHitRadius: 12,
+        pointHitRadius: 14   // aumenta área de hit do ponto
       }]
     },
     options: {
       responsive: true,
       interaction: {
-        mode: 'nearest',      // modo 'nearest'
-        intersect: false      // aceita clique próximo (com hit radius)
+        mode: 'nearest',
+        intersect: true   // exige estar sobre o ponto (mas hit radius ajuda)
       },
       plugins: {
-        legend: { display: true, position: "top" },
-       
-        tooltip: {
-          enabled: true,
-          // evitar que tooltip bloqueie clique: curto delay ao mostrar
-          delay: { show: 50, hide: 100 },
-          callbacks: {
-            title: (ctx) => `🗓️ ${ctx[0].label}`,
-            label: (ctx) => `📊 ${nomeProduto}: ${ctx.formattedValue} vendidos`
-            
-          }
-        }
+        title: { display: true, text: "📈 Vendas por mês" },
+        tooltip: { enabled: false },
+        legend: { display: false }
       },
-      onClick: (evt) => {
-        // console debug
-        // console.log("chart1 onclick evt:", evt);
+      onHover: (evt, activeEls, chart) => {
+  const elset = activeEls && activeEls.length
+    ? activeEls
+    : chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
 
-        // pega elementos mais próximos do clique (tolerância por pointHitRadius)
-        const points = window.chart1.getElementsAtEventForMode(evt, 'nearest', { intersect: false }, true);
-        if (!points || !points.length) {
-          // nenhum ponto próximo
-          // console.log("Nenhum ponto próximo clicado.");
-          return;
-        }
+  if (elset && elset.length) {
+    const idx = elset[0].index;
+    const monthIndex = monthKeys[idx];
+    const productSelLocal = document.getElementById("productFilter")?.value || "__ALL__";
 
-        const idx = points[0].index;
-        const mesSelecionado = labels1[idx];
-        // highlight temporário do ponto clicado
-        highlightChartPoint(window.chart1, 0, idx);
+    // 🔹 Filtra pedidos daquele mês
+    const filtrados = pedidos.filter(p => {
+      const dt = new Date(p.data_hora);
+      return dt.getMonth() === monthIndex;
+    });
 
-        // chama popup após leve atraso (evita conflito com tooltip)
-        setTimeout(() => showOrdersForMonth(mesSelecionado), 200);
-      },
+    // 🔹 Monta resumo por subtipo
+    const resumo = {};
+    filtrados.forEach(p => {
+      (p.items || []).forEach(it => {
+        if (productSelLocal !== "__ALL__" && it.product_name !== productSelLocal) return;
+        const key = `${it.product_name} (${it.option_name})`;
+        resumo[key] = (resumo[key] || 0) + (it.quantidade || 0);
+      });
+    });
+
+    const resumoHTML = Object.entries(resumo)
+      .map(([k, v]) => `<li>${k}: <strong>${v}</strong></li>`)
+      .join("") || "<li>Nenhum item</li>";
+
+    const clientX =
+      evt.native?.clientX ??
+      (evt.x ? evt.chart?.canvas?.getBoundingClientRect().left + evt.x : window.innerWidth / 2);
+    const clientY =
+      evt.native?.clientY ??
+      (evt.y ? evt.chart?.canvas?.getBoundingClientRect().top + evt.y : window.innerHeight / 2);
+
+    // 🔹 Passa pedidos reais (filtrados) para contar corretamente no popup
+    showHoverPopupDetailed(
+      `📅 ${mesesNome[monthIndex]} — Detalhes por subtipo`,
+      resumoHTML,
+      filtrados, // ← agora passamos o array de pedidos!
+      "mes",
+      clientX,
+      clientY,
+      productSelLocal
+    );
+  } else {
+    hideHoverPopupDetailed();
+  }
+},
+      onLeave: () => hideHoverPopupDetailed(),
       scales: {
-        y: { beginAtZero: true, title: { display: true, text: "Quantidade vendida" } },
+        y: { beginAtZero: true, title: { display: true, text: "Quantidade" } },
         x: { title: { display: true, text: "Mês" } }
       }
     }
   });
-}  // ========== 2️⃣ VENDAS POR CHUVA ==========
+}
+  // ========== 2️⃣ VENDAS POR CHUVA ==========
   const byChuva = {};
-  pedidos.forEach(p => {
+  pedidosFiltrados.forEach(p => {
     const cat = p.chuva_categoria || "Sem dado";
     (p.items || []).forEach(it => {
       if (productSel === "__ALL__" || it.product_name === productSel) {
@@ -250,19 +314,54 @@ if (ctx1) {
   const labels2 = Object.keys(byChuva);
   const data2 = labels2.map(l => byChuva[l]);
   const ctx2 = document.getElementById("chart2")?.getContext("2d");
+// ========== 2️⃣ Gráfico: Vendas por chuva (hover popup preciso) ==========
+// ========== 2️⃣ Gráfico: Vendas por chuva (hover por coluna) ==========
+if (ctx2) {
+  if (window.chart2 && typeof window.chart2.destroy === "function") window.chart2.destroy();
+  window.chart2 = new Chart(ctx2, {
+    type: "bar",
+    data: {
+      labels: labels2,
+      datasets: [{
+        label: "Por chuva",
+        data: data2,
+        backgroundColor: "#00B4D8"
+      }]
+    },
+    options: {
+      plugins: { title: { display: true, text: "🌧️ Vendas por categoria de chuva" }, legend: { display: false }, tooltip: { enabled: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { beginAtZero: true } },
+      // onHover usando a API getElementsAtEventForMode para pegar a coluna inteira
+      onHover: (evt, activeEls, chart) => {
+        try {
+          const elset = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+          if (elset && elset.length) {
+            const idx = elset[0].index;
+            const categoria = labels2[idx];
 
-  if (ctx2) {
-    if (window.chart2 && typeof window.chart2.destroy === "function") window.chart2.destroy();
-    window.chart2 = new Chart(ctx2, {
-      type: "bar",
-      data: { labels: labels2, datasets: [{ label: "Por chuva", data: data2, backgroundColor: "#00B4D8" }] },
-      options: { scales: { y: { beginAtZero: true } } }
-    });
-  }
+            // client coords robustos
+            const clientX = evt.native?.clientX ?? (evt.x ? (evt.chart?.canvas?.getBoundingClientRect().left + evt.x) : 0);
+            const clientY = evt.native?.clientY ?? (evt.y ? (evt.chart?.canvas?.getBoundingClientRect().top + evt.y) : 0);
+
+            const productSelLocal = document.getElementById("productFilter")?.value || "__ALL__";
+            showHoverPopupDetailed(`🌧️ Categoria de chuva: ${categoria}`, categoria, pedidosFiltrados, "chuva", clientX, clientY, productSelLocal);
+          } else {
+            hideHoverPopupDetailed();
+          }
+        } catch (e) {
+          // fallback: esconde popup em caso de erro
+          hideHoverPopupDetailed();
+        }
+      },
+      onLeave: () => hideHoverPopupDetailed()
+    }
+  });
+}
 
   // ========== 3️⃣ VENDAS POR TEMPERATURA ==========
   const byTemp = {};
-  pedidos.forEach(p => {
+  pedidosFiltrados.forEach(p => {
     const cat = p.temp_categoria || "Sem dado";
     (p.items || []).forEach(it => {
       if (productSel === "__ALL__" || it.product_name === productSel) {
@@ -275,15 +374,58 @@ if (ctx1) {
   const data3 = labels3.map(l => byTemp[l]);
   const ctx3 = document.getElementById("chart3")?.getContext("2d");
 
-  if (ctx3) {
-    if (window.chart3 && typeof window.chart3.destroy === "function") window.chart3.destroy();
-    window.chart3 = new Chart(ctx3, {
-      type: "bar",
-      data: { labels: labels3, datasets: [{ label: "Por temperatura", data: data3, backgroundColor: "#FF6B6B" }] },
-      options: { scales: { y: { beginAtZero: true } } }
+ // ========== 3️⃣ Gráfico: Vendas por temperatura (hover popup preciso) ==========
+// ========== 3️⃣ Gráfico: Vendas por temperatura (hover por coluna) ==========
+if (ctx3) {
+  if (window.chart3 && typeof window.chart3.destroy === "function") window.chart3.destroy();
+  window.chart3 = new Chart(ctx3, {
+    type: "bar",
+    data: {
+      labels: labels3,
+      datasets: [{
+        label: "Por temperatura",
+        data: data3,
+        backgroundColor: "#FF6B6B"
+      }]
+    },
+    options: {
+      plugins: { title: { display: true, text: "🌡️ Vendas por categoria de temperatura" }, legend: { display: false }, tooltip: { enabled: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { beginAtZero: true } },
+      onHover: (evt, activeEls, chart) => {
+        try {
+          const elset = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+          if (elset && elset.length) {
+            const idx = elset[0].index;
+            const categoria = labels3[idx];
+
+            const clientX = evt.native?.clientX ?? (evt.x ? (evt.chart?.canvas?.getBoundingClientRect().left + evt.x) : 0);
+            const clientY = evt.native?.clientY ?? (evt.y ? (evt.chart?.canvas?.getBoundingClientRect().top + evt.y) : 0);
+
+            const productSelLocal = document.getElementById("productFilter")?.value || "__ALL__";
+            showHoverPopupDetailed(`🌡️ Categoria de temperatura: ${categoria}`, categoria, pedidosFiltrados, "temperatura", clientX, clientY, productSelLocal);
+          } else {
+            hideHoverPopupDetailed();
+          }
+        } catch (e) {
+          hideHoverPopupDetailed();
+        }
+      },
+      onLeave: () => hideHoverPopupDetailed()
+    }
+  });
+}
+
+
+// 🔧 Garante que o popup desapareça ao sair do gráfico
+['chart1', 'chart2', 'chart3'].forEach(id => {
+  const canvas = document.getElementById(id);
+  if (canvas) {
+    canvas.addEventListener('mouseleave', () => {
+      hideHoverPopupDetailed();
     });
   }
-
+});
   logDebug("✅ Gráficos renderizados com sucesso!");
 }
 
@@ -311,6 +453,177 @@ function highlightChartPoint(chart, datasetIndex, pointIndex) {
   }, 900);
 }
 
+
+// Mostra popup genérico com detalhes por categoria (mês, chuva ou temperatura)
+function showOrdersForCategory(titulo, categoria, pedidos, tipo = "categoria") {
+  // filtra os pedidos do tipo selecionado
+  const filtrados = pedidos.filter(p => {
+    if (tipo === "mês") {
+      const mes = new Date(p.data_hora).getMonth();
+      return mes === categoria;
+    } else if (tipo === "chuva") {
+      return (p.chuva_categoria || "Sem dado") === categoria;
+    } else if (tipo === "temperatura") {
+      return (p.temp_categoria || "Sem dado") === categoria;
+    }
+    return false;
+  });
+
+  // conta produtos no conjunto filtrado
+  const produtosResumo = {};
+  filtrados.forEach(p => {
+    (p.items || []).forEach(it => {
+      const key = `${it.product_name} (${it.option_name})`;
+      produtosResumo[key] = (produtosResumo[key] || 0) + it.quantidade;
+    });
+  });
+
+  // monta conteúdo
+  const produtosHTML = Object.entries(produtosResumo)
+    .map(([nome, qtd]) => `<li>${nome}: <strong>${qtd}</strong></li>`)
+    .join("");
+
+  // cria caixa flutuante (popup)
+  const box = document.createElement("div");
+  box.className = "popup-detalhes";
+  box.innerHTML = `
+    <h3>${titulo}</h3>
+    <p><strong>${filtrados.length}</strong> pedidos encontrados</p>
+    <ul>${produtosHTML || "<li>Nenhum item encontrado.</li>"}</ul>
+    <button class="btn alt" onclick="this.parentElement.remove()">Fechar</button>
+  `;
+  Object.assign(box.style, {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "#fff",
+    border: "2px solid #0077B6",
+    borderRadius: "10px",
+    padding: "20px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    zIndex: 1000,
+    maxWidth: "400px",
+    textAlign: "left"
+  });
+  document.body.appendChild(box);
+}
+// === Popup flutuante para hover (posicionamento preciso + respeita filtro de produto) ===
+// === Popup flutuante para hover (preciso: posicionamento por clientX/clientY + respeita produto) ===
+// popup flutuante robusto — funciona para tipo = "mes", "chuva", "temperatura"
+let hoverPopupEl = null;
+let hoverPopupTimer = null;
+function showHoverPopupDetailed(titulo, categoria, pedidos, tipo, clientX, clientY, productSel) {
+  // limpa timeout anterior (evita fechamento prematuro)
+  if (hoverPopupTimer) {
+    clearTimeout(hoverPopupTimer);
+    hoverPopupTimer = null;
+  }
+
+  // 🔹 Define o conjunto de pedidos usados
+  let filtrados = [];
+  if (Array.isArray(pedidos) && pedidos.length > 0) {
+    // Caso "mês": já vem filtrado no parâmetro
+    filtrados = pedidos;
+  } else {
+    // Caso chuva/temperatura: filtra globalmente
+    filtrados = pedidosGlobais || [];
+    filtrados = filtrados.filter(p => {
+      const produtoOK =
+        productSel === "__ALL__" ||
+        (p.items || []).some(it => it.product_name === productSel);
+      if (!produtoOK) return false;
+      if (tipo === "chuva")
+        return (p.chuva_categoria || "Sem dado") === categoria;
+      if (tipo === "temperatura")
+        return (p.temp_categoria || "Sem dado") === categoria;
+      return true;
+    });
+  }
+
+  // 🔹 Calcula total de pedidos de acordo com o filtro ativo
+let totalPedidos = 0;
+if (productSel === "__ALL__") {
+  totalPedidos = filtrados.length;
+} else {
+  // conta apenas pedidos que contêm o produto selecionado
+  totalPedidos = filtrados.filter(p =>
+    (p.items || []).some(it => it.product_name === productSel)
+  ).length;
+}
+
+  // 🔹 Monta resumo por produto (respeitando productSel)
+  const resumo = {};
+  filtrados.forEach(p => {
+    (p.items || []).forEach(it => {
+      if (productSel !== "__ALL__" && it.product_name !== productSel) return;
+      const key = `${it.product_name} (${it.option_name})`;
+      resumo[key] = (resumo[key] || 0) + it.quantidade;
+    });
+  });
+
+  const resumoHTML =
+    Object.entries(resumo)
+      .map(([k, v]) => `<li>${k}: <strong>${v}</strong></li>`)
+      .join("") || "<li>Nenhum item</li>";
+
+  if (!hoverPopupEl) {
+    hoverPopupEl = document.createElement("div");
+    hoverPopupEl.className = "hover-popup-detalhe";
+    document.body.appendChild(hoverPopupEl);
+  }
+
+  hoverPopupEl.innerHTML = `
+    <h4 style="margin:0 0 6px 0;">${titulo}</h4>
+    <div style="font-size:13px; color:#333; margin-bottom:6px;">
+      <strong>${totalPedidos}</strong> pedidos
+    </div>
+    <ul style="margin:0; padding-left:14px;">${resumoHTML}</ul>
+  `;
+
+  // 🔹 Posiciona popup
+  const pad = 12;
+  const maxWidth = 320;
+  hoverPopupEl.style.display = "block";
+  hoverPopupEl.style.opacity = "1";
+  hoverPopupEl.style.maxWidth = maxWidth + "px";
+
+  const pageW = window.innerWidth;
+  const pageH = window.innerHeight;
+  let left = clientX + pad;
+  let top = clientY - 30;
+  if (left + maxWidth + 10 > pageW) left = clientX - maxWidth - pad;
+  if (top + 150 > pageH) top = pageH - 170;
+  if (top < 10) top = 10;
+
+  hoverPopupEl.style.left = left + "px";
+  hoverPopupEl.style.top = top + "px";
+
+  // fecha popup se mouse sair da janela
+  window.onmouseleave = () => hideHoverPopupDetailed();
+}
+
+// ------------------------------------------------------------
+// Função para esconder o popup de detalhes (todas as telas)
+// ------------------------------------------------------------
+function hideHoverPopupDetailed() {
+  if (!hoverPopupEl) return;
+  if (hoverPopupTimer) {
+    clearTimeout(hoverPopupTimer);
+    hoverPopupTimer = null;
+  }
+
+  // Faz o popup desaparecer rapidamente
+  hoverPopupEl.style.transition = "opacity 0.12s ease-out";
+  hoverPopupEl.style.opacity = "0";
+
+  hoverPopupTimer = setTimeout(() => {
+    try {
+      hoverPopupEl.style.display = "none";
+    } catch (e) {}
+    hoverPopupTimer = null;
+  }, 120);
+}
 // ============================================================
 // 🔹 Alternar visibilidade do histórico de pedidos
 // ============================================================
@@ -327,10 +640,7 @@ function setupHistoricoToggle() {
   });
 }
 
-// Garante que o botão funcione após o carregamento
-window.addEventListener('load', () => {
-  setupHistoricoToggle();
-});
+
 
 
 
@@ -339,13 +649,14 @@ window.addEventListener('load', () => {
 // ============================================================
 async function showOrdersForMonth(nomeMes) {
   // Remove popup antigo (se existir)
+  alert(`📅 Detalhes de ${mesSelecionado}: ${pedidosFiltrados.length} pedidos.`);
   const existente = document.getElementById("detalhesMes");
   if (existente) existente.remove();
 
   // Mapeamento de nome do mês → número (0 = janeiro)
   const meses = {
-    Janeiro: 0, Fevereiro: 1, Março: 2, Abril: 3, Maio: 4, Junho: 5,
-    Julho: 6, Agosto: 7, Setembro: 8, Outubro: 9, Novembro: 10, Dezembro: 11
+    Jan: 0, Fev: 1, Mar: 2, Abr: 3, Mai: 4, Jun: 5,
+    Jul: 6, Ago: 7, Set: 8, Out: 9, Nov: 10, Dez: 11
   };
   const mesNumero = meses[nomeMes];
   if (mesNumero === undefined) return;

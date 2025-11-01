@@ -340,3 +340,24 @@ header {
   font-size: 14px;
 }
 
+
+.hover-popup-detalhe {
+  position: fixed;
+  z-index: 3000;
+  background: #fff;
+  border: 1px solid rgba(2,62,138,0.12);
+  border-left: 4px solid #0077B6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+  display: none;
+  opacity: 0;
+  font-size: 13px;
+  color: #111;
+  max-width: 320px;
+}
+.hover-popup-detalhe h4 { color: #023E8A; font-size: 14px; margin:0; }
+.hover-popup-detalhe ul { margin:6px 0 0 0; padding-left:14px; }
+.hover-popup-detalhe li { margin:4px 0; }
