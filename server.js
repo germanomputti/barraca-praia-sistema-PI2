@@ -6,9 +6,6 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
-app.get("/", (req,res)=>{
-  res.sendFile(path.join(__dirname,"public","index.html"));
-});
 
 
 const app = express();
