@@ -101,7 +101,8 @@ if (yearSelect) {
     // ========================================================
     renderCharts(pedidos);
 
-   // ============================================================
+
+  // ============================================================
 // 📅 Novo formato: uma linha por dia, agregando todos os pedidos
 // ============================================================
 const tabela = document.getElementById('histTable');
@@ -110,7 +111,6 @@ const tbody = tabela ? tabela.querySelector('tbody') : null;
 if (tbody) {
   tbody.innerHTML = '';
 
-  // Agrupa pedidos por data (AAAA-MM-DD)
   const groupedByDate = {};
   pedidos.forEach(p => {
     const data = p.data_hora.slice(0, 10);
@@ -118,14 +118,12 @@ if (tbody) {
     groupedByDate[data].push(p);
   });
 
-  // Monta uma linha por dia
   Object.keys(groupedByDate)
     .sort()
     .forEach(data => {
       const pedidosDoDia = groupedByDate[data];
-
-      // Cria um mapa para somar quantidades dos mesmos produtos
       const produtosResumo = {};
+
       pedidosDoDia.forEach(p => {
         (p.items || []).forEach(it => {
           const key = `${it.product_name} (${it.option_name})`;
@@ -133,11 +131,9 @@ if (tbody) {
         });
       });
 
-      // Pega categorias do primeiro pedido (são iguais no dia)
       const catChuva = pedidosDoDia[0].chuva_categoria || '-';
       const catTemp = pedidosDoDia[0].temp_categoria || '-';
 
-      // Cria linha da tabela
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${new Date(data).toLocaleDateString('pt-BR')}</td>
@@ -151,49 +147,11 @@ if (tbody) {
     });
 
   console.log(`✅ Histórico preenchido com ${Object.keys(groupedByDate).length} dias.`);
-} else {
-  console.warn("⚠️ Tabela de histórico (#histTable) não encontrada no DOM.");
 }
-
   } catch (e) {
     logDebug("❌ Erro ao carregar análise: " + e.message);
   }
-}
 
-// ============================================================
-// 🔹 Ordenação da tabela de histórico por data
-// ============================================================
-let sortAsc = true; // começa crescente
-
-function setupSortHistorico() {
-  const thData = document.getElementById('thData');
-  if (!thData) return;
-
-  thData.addEventListener('click', () => {
-    const tabela = document.getElementById('histTable');
-    const tbody = tabela?.querySelector('tbody');
-    if (!tbody) return;
-
-    const linhas = Array.from(tbody.querySelectorAll('tr'));
-    if (linhas.length === 0) return;
-
-    // Ordena conforme a direção atual
-    linhas.sort((a, b) => {
-      const dataA = new Date(a.cells[0].textContent.split('/').reverse().join('-'));
-      const dataB = new Date(b.cells[0].textContent.split('/').reverse().join('-'));
-      return sortAsc ? dataA - dataB : dataB - dataA;
-    });
-
-    // Atualiza o tbody
-    tbody.innerHTML = '';
-    linhas.forEach(l => tbody.appendChild(l));
-
-    // Atualiza símbolo no cabeçalho
-    thData.textContent = sortAsc ? 'Data ⬆️' : 'Data ⬇️';
-    sortAsc = !sortAsc;
-  });
-
-  console.log("✅ Ordenação por data configurada.");
 }
 // Função que cria os 3 gráficos principais
 
@@ -671,32 +629,6 @@ function hideHoverPopupDetailed() {
     hoverPopupTimer = null;
   }, 120);
 }
-// ============================================================
-// 🔹 Alternar visibilidade do histórico de pedidos
-// ============================================================
-function setupHistoricoToggle() {
-  const btn = document.getElementById('toggleHistorico');
-  const tabela = document.getElementById('histTable');
-
-  if (!btn || !tabela) {
-    console.warn("⚠️ Elementos de histórico não encontrados no DOM.");
-    return;
-  }
-
-  // começa oculta
-  tabela.style.display = 'none';
-
-  btn.addEventListener('click', () => {
-    const visivel = tabela.style.display === 'block';
-    tabela.style.display = visivel ? 'none' : 'block';
-    btn.textContent = visivel
-      ? '📋 Mostrar histórico de pedidos'
-      : '❌ Ocultar histórico de pedidos';
-  });
-
-  console.log("✅ Alternância do histórico configurada.");
-}
-
 
 
 
@@ -763,10 +695,66 @@ async function showOrdersForMonth(nomeMes) {
   const container = document.querySelector(".graficos-container");
   container.insertAdjacentHTML("afterend", html);
 }
+// ============================================================
+// 🔹 Alternar visibilidade do histórico de pedidos
+// ============================================================
+function setupHistoricoToggle() {
+  const btn = document.getElementById('toggleHistorico');
+  const tabela = document.getElementById('histTable');
+
+  if (!btn || !tabela) {
+    console.warn("⚠️ Elementos de histórico não encontrados no DOM.");
+    return;
+  }
+
+  // Começa oculta
+  tabela.style.display = 'none';
+
+  btn.addEventListener('click', () => {
+    const visivel = tabela.style.display === 'block';
+    tabela.style.display = visivel ? 'none' : 'block';
+    btn.textContent = visivel
+      ? '📋 Mostrar histórico de pedidos'
+      : '❌ Ocultar histórico de pedidos';
+    console.log(`📋 Histórico agora está ${visivel ? 'oculto' : 'visível'}.`);
+  });
+
+  console.log("✅ Alternância do histórico configurada.");
+}
+
 
 // ============================================================
-// 🚀 Inicialização garantida após o DOM carregar
+// 🔹 Função para ordenar a tabela de histórico por data
 // ============================================================
+function setupTableSorting() {
+  const thData = document.getElementById('thData');
+  const tabela = document.getElementById('histTable');
+  if (!thData || !tabela) return;
+
+  let ordemAsc = true; // estado inicial
+
+  thData.addEventListener('click', () => {
+    const tbody = tabela.querySelector('tbody');
+    const linhas = Array.from(tbody.querySelectorAll('tr'));
+
+    // ordena as linhas conforme a data na primeira coluna
+    linhas.sort((a, b) => {
+      const dataA = new Date(a.cells[0].textContent.split('/').reverse().join('-'));
+      const dataB = new Date(b.cells[0].textContent.split('/').reverse().join('-'));
+      return ordemAsc ? dataA - dataB : dataB - dataA;
+    });
+
+    // recria o corpo da tabela com as linhas ordenadas
+    tbody.innerHTML = '';
+    linhas.forEach(l => tbody.appendChild(l));
+
+    // alterna ordem para o próximo clique
+    ordemAsc = !ordemAsc;
+    thData.textContent = ordemAsc ? '📅 Data ⬆️' : '📅 Data ⬇️';
+  });
+
+  console.log("✅ Ordenação por data configurada.");
+}
 // ============================================================
 // 🧭 Inicialização segura — garante ordem correta de execução
 // ============================================================
@@ -775,10 +763,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   await new Promise(r => setTimeout(r, 800));
   await loadAnalysis();
-
   setupHistoricoToggle();
-  setupSortHistorico(); // ← aqui
-
-  const linhas = document.querySelectorAll('#histTable tbody tr').length;
-  console.log(`📊 Linhas detectadas na tabela: ${linhas}`);
+  setupTableSorting(); // 🔹 adiciona ordenação por data
 });
