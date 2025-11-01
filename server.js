@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const axios = require('axios');
@@ -144,7 +145,9 @@ app.post('/api/pedidos', async (req,res) => {
     const { cliente='', numero_mesa='', items=[] } = req.body;
     const data_hora = new Date().toISOString();
     const dateOnly = data_hora.split('T')[0];
-    const clima = await getClimaForDate(dateOnly);
+      send("🌦️ Gerando histórico completo de clima 2024 → ontem...");
+  await gerarHistoricoCompleto();
+  send("✅ Clima de 2024 até ontem gerado!");
     const clima_id = clima ? clima.id : null;
     const total = items.reduce((acc,it) => acc + (it.price_unit||0)*(it.quantidade||1), 0);
     db.run('INSERT INTO pedidos (cliente, numero_mesa, status, data_hora, total, clima_id) VALUES (?, ?, ?, ?, ?, ?)', [cliente, numero_mesa, 'Aguardando', data_hora, total, clima_id], function(err){
@@ -206,3 +209,73 @@ module.exports = app;
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
 }
+
+
+
+// ========================================
+// ROTAS ADMIN
+// ========================================
+app.post('/admin/clear-db', (req, res) => {
+  const pin = req.body.pin;
+  if (pin !== process.env.ADMIN_PIN) {
+    return res.status(401).json({ ok: false, msg: 'PIN incorreto' });
+  }
+
+  db.serialize(() => {
+    db.run("DELETE FROM pedido_items");
+    db.run("DELETE FROM pedidos");
+    db.run("DELETE FROM clima");
+    db.run("VACUUM");
+  });
+
+  res.json({ ok: true, msg: "Banco limpo com sucesso" });
+});
+
+const { execFile } = require("child_process");
+
+
+
+
+app.post("/admin/seed", (req, res) => {
+  const { pin } = req.body;
+  if (pin !== process.env.ADMIN_PIN) {
+    res.status(401).setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.end("❌ PIN incorreto\n");
+  }
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Transfer-Encoding", "chunked");
+
+  const send = (txt) => res.write((txt.endsWith("\n") ? txt : txt+"\n"));
+
+  send("⏳ Iniciando seed completo...");
+
+  const seedProductsPath = path.join(__dirname, "seed_products.js");
+  const seedOrdersPath   = path.join(__dirname, "seed_fake_orders.js");
+
+  // primeiro: seed_products
+  const child1 = execFile("node", [seedProductsPath]);
+
+  child1.stdout.on("data", (data) => send("📦 seed_products: " + data.toString()));
+  child1.stderr.on("data", (data) => send("❌ seed_products: " + data.toString()));
+
+  child1.on("exit", (code) => {
+    if (code !== 0) {
+      send("❌ seed_products terminou com erro. Abortando.");
+      return res.end();
+    }
+
+    send("✅ Produtos inseridos. Agora gerando pedidos...");
+
+    // depois: seed_fake_orders
+    const child2 = execFile("node", [seedOrdersPath]);
+
+    child2.stdout.on("data", (data) => send("🧾 seed_pedidos: " + data.toString()));
+    child2.stderr.on("data", (data) => send("❌ seed_pedidos: " + data.toString()));
+
+    child2.on("exit", (code2) => {
+      send(code2 === 0 ? "✅ Finalizado!" : "❌ Finalizado com erro");
+      res.end();
+    });
+  });
+});

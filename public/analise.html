@@ -25,7 +25,13 @@
   <label for="productFilter">Filtrar produto:</label>
   <select id="productFilter"></select>
 </div>
-   
+<button class="btn danger" onclick="clearDB()">🗑 Apagar tudo do banco</button>
+<button class="btn alt" onclick="runSeed()">🌱 Gerar dados simulados</button>
+
+<div id="seedLog" style="font-family:monospace;font-size:13px;white-space:pre-line;
+background:#000;color:#0f0;padding:10px;display:none;border-radius:8px;margin:10px 0;">
+</div>
+
     <div class="graficos-container">
       <div class="grafico-card">
         <canvas id="chart1"></canvas>

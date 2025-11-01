@@ -8,6 +8,13 @@ function logDebug(msg) {
   if (box) box.innerHTML += msg + "<br>";
   console.log(msg);
 }
+// mensagem de criacao de DB
+function seedPrint(msg) {
+  const box = document.getElementById("seedLog");
+  box.style.display = "block";
+  box.textContent += msg + "\n";
+  box.scrollTop = box.scrollHeight;
+}
 
 // ============================================================
 // 🔹 FUNÇÃO PARA BUSCAR PRODUTOS (para o filtro da análise)
@@ -119,9 +126,9 @@ if (tbody) {
   });
 
   Object.keys(groupedByDate)
-    .sort()
-    .forEach(data => {
-      const pedidosDoDia = groupedByDate[data];
+  .sort((a, b) => new Date(b) - new Date(a)) // ← ordena por data DESC (mais recente primeiro)
+  .forEach(data => {
+    const pedidosDoDia = groupedByDate[data];
       const produtosResumo = {};
 
       pedidosDoDia.forEach(p => {
@@ -747,6 +754,87 @@ function setupTableSorting() {
 
   console.log("✅ Ordenação por data configurada.");
 }
+
+
+// adicionando funcao para limpar banco de dados e criar novos dados fake
+async function clearDB(){
+  const pin = prompt("Digite o PIN de administrador:");
+  if(!pin) return;
+  
+  const r = await fetch('/admin/clear-db',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pin})
+  });
+  const j = await r.json();
+  alert(j.msg || "OK");
+  location.reload();
+}
+
+function seedPrint(msg) {
+  const box = document.getElementById("seedLog");
+  if (!box) return;
+  box.style.display = "block";
+  box.textContent += msg;
+  if (!msg.endsWith("\n")) box.textContent += "\n";
+  box.scrollTop = box.scrollHeight;
+}
+
+async function runSeed() {
+  const pin = prompt("Digite o PIN de administrador:");
+  if (!pin) return;
+
+  const box = document.getElementById("seedLog");
+  if (box) {
+    box.style.display = "block";
+    box.textContent = "";
+  }
+  seedPrint("⏳ Iniciando seed...(dashboard");
+
+  try {
+    const resp = await fetch("/admin/seed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin })
+    });
+
+    // Se o servidor devolveu erro imediatamente (ex.: PIN incorreto)
+    if (!resp.ok && resp.body == null) {
+      const txt = await resp.text();
+      seedPrint("❌ Erro: " + txt);
+      return;
+    }
+
+    // Streaming
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    let allText = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      allText += chunk;
+      seedPrint(chunk);
+
+      if (chunk.includes("Finalizado!")) {
+        setTimeout(() => location.reload(), 1000);
+      }
+    }
+
+    // Caso o servidor responda 401 com corpo em texto (PIN incorreto via stream)
+    if (!resp.ok) {
+      seedPrint("❌ Erro HTTP " + resp.status);
+      return;
+    }
+  } catch (e) {
+    seedPrint("❌ Falha na requisição: " + e.message);
+  }
+}
+
+// Garante que a função esteja realmente no escopo global para o onclick do HTML
+window.runSeed = runSeed;
 // ============================================================
 // 🧭 Inicialização segura — garante ordem correta de execução
 // ============================================================
@@ -758,3 +846,5 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupHistoricoToggle();
   setupTableSorting(); // 🔹 adiciona ordenação por data
 });
+
+
