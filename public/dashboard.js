@@ -135,31 +135,108 @@ async function loadAnalysis() {
 
   // Usa o valor do seletor ou o que for passado via argumento
   const productSel = selectedProduct || document.getElementById("productFilter")?.value || "__ALL__";
-  // ========== 1️⃣ VENDAS POR MÊS ==========
-  const byMonth = {};
-  pedidos.forEach(p => {
-    const mes = p.data_hora ? p.data_hora.slice(0, 7) : "Desconhecido";
-    (p.items || []).forEach(it => {
-      if (productSel === "__ALL__" || it.product_name === productSel) {
-        byMonth[mes] = (byMonth[mes] || 0) + (it.quantidade || 0);
-      }
-    });
+  
+// ========== 1️⃣ VENDAS POR MÊS (AGRUPANDO POR NOME DO MÊS) ==========
+const byMonth = {};
+const mesesNomes = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+];
+
+pedidos.forEach(p => {
+  if (!p.data_hora) return;
+  const date = new Date(p.data_hora);
+  const mesNome = mesesNomes[date.getMonth()]; // converte número em nome
+  (p.items || []).forEach(it => {
+    if (productSel === "__ALL__" || it.product_name === productSel) {
+      byMonth[mesNome] = (byMonth[mesNome] || 0) + (it.quantidade || 0);
+    }
   });
+});
 
-  const labels1 = Object.keys(byMonth);
-  const data1 = labels1.map(l => byMonth[l]);
-  const ctx1 = document.getElementById("chart1")?.getContext("2d");
+// Ordena os meses na ordem correta
+const labels1 = mesesNomes.filter(m => byMonth[m]);
+const data1 = labels1.map(m => byMonth[m]);
+// ---------- criação/atualização do chart1 (LINHA) ----------
+const ctx1Elem = document.getElementById("chart1");
+const ctx1 = ctx1Elem?.getContext("2d");
 
-  if (ctx1) {
-    if (window.chart1 && typeof window.chart1.destroy === "function") window.chart1.destroy();
-    window.chart1 = new Chart(ctx1, {
-      type: "bar",
-      data: { labels: labels1, datasets: [{ label: "Vendas por mês", data: data1, backgroundColor: "#219EBC" }] },
-      options: { scales: { y: { beginAtZero: true } } }
-    });
+if (ctx1) {
+  // destrói se existir
+  if (window.chart1 && typeof window.chart1.destroy === "function") {
+    try { window.chart1.destroy(); } catch(e) { console.warn("destroy chart1:", e); }
   }
 
-  // ========== 2️⃣ VENDAS POR CHUVA ==========
+  // produto selecionado (para label)
+  const productSel = document.getElementById("productFilter")?.value || "__ALL__";
+  const nomeProduto = productSel === "__ALL__" ? "Todos os produtos" : productSel;
+
+  // cria gráfico com interação e maiores áreas de clique
+  window.chart1 = new Chart(ctx1, {
+    type: "line",
+    data: {
+      labels: labels1,
+      datasets: [{
+        label: nomeProduto,
+        data: data1,
+        borderColor: "#0077B6",
+        backgroundColor: "rgba(0,119,182,0.15)",
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: "#023E8A",
+        pointRadius: 6,        // aumenta ponto (visível)
+        pointHoverRadius: 9,
+        // importante: hit radius para facilitar clique
+        pointHitRadius: 12,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: {
+        mode: 'nearest',      // modo 'nearest'
+        intersect: false      // aceita clique próximo (com hit radius)
+      },
+      plugins: {
+        legend: { display: true, position: "top" },
+       
+        tooltip: {
+          enabled: true,
+          // evitar que tooltip bloqueie clique: curto delay ao mostrar
+          delay: { show: 50, hide: 100 },
+          callbacks: {
+            title: (ctx) => `🗓️ ${ctx[0].label}`,
+            label: (ctx) => `📊 ${nomeProduto}: ${ctx.formattedValue} vendidos`
+            
+          }
+        }
+      },
+      onClick: (evt) => {
+        // console debug
+        // console.log("chart1 onclick evt:", evt);
+
+        // pega elementos mais próximos do clique (tolerância por pointHitRadius)
+        const points = window.chart1.getElementsAtEventForMode(evt, 'nearest', { intersect: false }, true);
+        if (!points || !points.length) {
+          // nenhum ponto próximo
+          // console.log("Nenhum ponto próximo clicado.");
+          return;
+        }
+
+        const idx = points[0].index;
+        const mesSelecionado = labels1[idx];
+        // highlight temporário do ponto clicado
+        highlightChartPoint(window.chart1, 0, idx);
+
+        // chama popup após leve atraso (evita conflito com tooltip)
+        setTimeout(() => showOrdersForMonth(mesSelecionado), 200);
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: "Quantidade vendida" } },
+        x: { title: { display: true, text: "Mês" } }
+      }
+    }
+  });
+}  // ========== 2️⃣ VENDAS POR CHUVA ==========
   const byChuva = {};
   pedidos.forEach(p => {
     const cat = p.chuva_categoria || "Sem dado";
@@ -210,6 +287,30 @@ async function loadAnalysis() {
   logDebug("✅ Gráficos renderizados com sucesso!");
 }
 
+
+// destaca temporariamente um ponto do gráfico (datasetIndex, pointIndex)
+function highlightChartPoint(chart, datasetIndex, pointIndex) {
+  if (!chart) return;
+  // guarda valores originais
+  const ds = chart.data.datasets[datasetIndex];
+  const origRadius = ds.pointRadius;
+  ds.pointRadius = ds.pointRadius || [];
+  // se pointRadius for único, converte para array
+  if (!Array.isArray(ds.pointRadius)) {
+    const r = ds.pointRadius;
+    ds.pointRadius = new Array(chart.data.labels.length).fill(r);
+  }
+  // aumenta o ponto clicado
+  ds.pointRadius[pointIndex] = (ds.pointRadius[pointIndex] || 6) + 6;
+  chart.update();
+
+  // volta ao normal em 900ms
+  setTimeout(() => {
+    ds.pointRadius[pointIndex] = (ds.pointRadius[pointIndex] || 12) - 6;
+    chart.update();
+  }, 900);
+}
+
 // ============================================================
 // 🔹 Alternar visibilidade do histórico de pedidos
 // ============================================================
@@ -232,6 +333,70 @@ window.addEventListener('load', () => {
 });
 
 
+
+// ============================================================
+// 🔍 Mostra pedidos detalhados ao clicar em um mês
+// ============================================================
+async function showOrdersForMonth(nomeMes) {
+  // Remove popup antigo (se existir)
+  const existente = document.getElementById("detalhesMes");
+  if (existente) existente.remove();
+
+  // Mapeamento de nome do mês → número (0 = janeiro)
+  const meses = {
+    Janeiro: 0, Fevereiro: 1, Março: 2, Abril: 3, Maio: 4, Junho: 5,
+    Julho: 6, Agosto: 7, Setembro: 8, Outubro: 9, Novembro: 10, Dezembro: 11
+  };
+  const mesNumero = meses[nomeMes];
+  if (mesNumero === undefined) return;
+
+  // Busca todos os pedidos
+  const resp = await fetch('/api/pedidos');
+  const pedidos = await resp.json();
+
+  // Filtra pedidos do mês selecionado
+  const filtrados = pedidos.filter(p => new Date(p.data_hora).getMonth() === mesNumero);
+
+  // Se não houver pedidos, mostra mensagem
+  if (filtrados.length === 0) {
+    alert(`Nenhum pedido encontrado para ${nomeMes}.`);
+    return;
+  }
+
+  // Cria conteúdo HTML da janela
+  let html = `
+    <div id="detalhesMes" class="popup-mes">
+      <h2>📅 Pedidos de ${nomeMes}</h2>
+      <button onclick="document.getElementById('detalhesMes').remove()" class="btn danger" style="float:right;">❌ Fechar</button>
+      <table>
+        <thead>
+          <tr><th>Data/Hora</th><th>Mesa</th><th>Cliente</th><th>Itens</th></tr>
+        </thead>
+        <tbody>
+          ${filtrados
+            .map(
+              (p) => `
+              <tr>
+                <td>${new Date(p.data_hora).toLocaleString("pt-BR")}</td>
+                <td>${p.numero_mesa}</td>
+                <td>${p.cliente || "-"}</td>
+                <td>${(p.items || [])
+                  .map((it) => `${it.product_name} (${it.option_name}) x${it.quantidade}`)
+                  .join("<br>")}
+                </td>
+              </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Insere logo abaixo dos gráficos
+  const container = document.querySelector(".graficos-container");
+  container.insertAdjacentHTML("afterend", html);
+}
+
 // ============================================================
 // 🚀 Inicialização garantida após o DOM carregar
 // ============================================================
@@ -243,3 +408,5 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadAnalysis();
   }, 800);
 });
+
+
