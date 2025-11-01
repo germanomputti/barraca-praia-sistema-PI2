@@ -1,8 +1,8 @@
 /**
- * seed_fake_orders.js
+ * seed_fake_orders.js (versão corrigida com timezone local)
  * ------------------------------------------------------------
  * Gera pedidos simulados para 1 ano, com dados reais de clima
- * obtidos pela API Open-Meteo (sem necessidade de chave).
+ * obtidos da API Open-Meteo já ajustados para o fuso de Brasília.
  * ------------------------------------------------------------
  */
 
@@ -29,7 +29,7 @@ function randomElement(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// Classificações de clima (iguais às do script R)
+// Classificações de clima
 function classifyChuva(mm) {
   if (mm <= 2.4) return "Sem/Muito fraca";
   if (mm <= 25) return "Fraca/Moderada";
@@ -42,27 +42,37 @@ function classifyTemp(temp) {
 }
 
 // ------------------------------------------------------------
-// 1️⃣ Obter dados de clima da API Open-Meteo
+// 1️⃣ Obter dados de clima da API Open-Meteo (fuso corrigido)
 // ------------------------------------------------------------
 async function getClimateData() {
   const start = `${ANO}-01-01`;
   const end = `${ANO}-12-31`;
+
+  // ✅ CORRIGIDO: adiciona timezone local para evitar "avanço de dia"
   const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${start}&end_date=${end}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum&timezone=America/Sao_Paulo`;
 
-  console.log("🌦️  Baixando dados climáticos de Open-Meteo...");
+  console.log("🌦️  Baixando dados climáticos (com timezone local)...");
   const resp = await fetch(url);
   const dados = await resp.json();
 
   if (!dados.daily) throw new Error("❌ Erro ao obter dados climáticos da API.");
 
-  const clima = dados.daily.time.map((data, i) => ({
-    data,
-    temp_media: dados.daily.temperature_2m_mean[i],
+// ✅ CORRIGIDO: recua um dia (Open-Meteo associa ao dia de término)
+const clima = dados.daily.time.map((data, i) => {
+  const d = new Date(data);
+  d.setDate(d.getDate() + 1); // 🔹 corrige deslocamento
+  const dataCorrigida = d.toISOString().slice(0, 10);
+
+  return {
+    data: dataCorrigida,
+    temp_mean: dados.daily.temperature_2m_mean[i],
     temp_max: dados.daily.temperature_2m_max[i],
-    chuva_mm: dados.daily.precipitation_sum[i],
+    temp_min: dados.daily.temperature_2m_min[i],
+    precip_sum: dados.daily.precipitation_sum[i],
     chuva_categoria: classifyChuva(dados.daily.precipitation_sum[i]),
     temp_categoria: classifyTemp(dados.daily.temperature_2m_max[i]),
-  }));
+  };
+});
 
   console.log(`✅ Dados de clima obtidos (${clima.length} dias).`);
   return clima;
@@ -75,17 +85,20 @@ function gerarPedidos(clima) {
   console.log("🧾 Gerando pedidos simulados com base no clima...");
   const pedidos = [];
 
-  clima.forEach(dia => {
+  clima.forEach((dia) => {
     const nPedidos = randomInt(5, 15); // pedidos por dia
     for (let i = 0; i < nPedidos; i++) {
       const hora = `${String(randomInt(10, 18)).padStart(2, "0")}:${String(randomInt(0, 59)).padStart(2, "0")}`;
-      const data_hora = `${dia.data}T${hora}:00`;
+
+      // ✅ CORRIGIDO: salva data local no formato ISO sem UTC
+      const data_hora = `${dia.data} ${hora}:00`;
 
       const items = [];
 
-      // Mais bebidas nos dias quentes, mais salgados nos frios
-      const bebidas = products.filter(p => ["Caipirinha", "Água de coco", "Refrigerante", "Sorvete"].includes(p.name));
-      const comidas = products.filter(p => !bebidas.includes(p));
+      const bebidas = products.filter((p) =>
+        ["Caipirinha", "Água de coco", "Refrigerante", "Sorvete"].includes(p.name)
+      );
+      const comidas = products.filter((p) => !bebidas.includes(p));
 
       const isQuente = dia.temp_max > 28;
       const baseProdutos = isQuente
@@ -109,7 +122,7 @@ function gerarPedidos(clima) {
         cliente: `Cliente ${randomInt(1, 100)}`,
         numero_mesa: randomInt(1, 20),
         status: "Concluído",
-        data_hora,
+        data_hora, // sem UTC
         total,
         chuva_categoria: dia.chuva_categoria,
         temp_categoria: dia.temp_categoria,
@@ -121,8 +134,9 @@ function gerarPedidos(clima) {
   console.log(`✅ Gerados ${pedidos.length} pedidos simulados.`);
   return pedidos;
 }
+
 // ------------------------------------------------------------
-// 3️⃣ Inserir no banco SQLite (versão assíncrona e segura)
+// 3️⃣ Inserir no banco SQLite
 // ------------------------------------------------------------
 async function inserirPedidos(pedidos) {
   console.log("💾 Inserindo pedidos simulados no banco...");
@@ -146,10 +160,8 @@ async function inserirPedidos(pedidos) {
     ) VALUES (?, ?, ?, ?, ?)
   `);
 
-  // usamos for...of para respeitar a ordem e evitar race conditions
   for (const p of pedidos) {
     await new Promise((resolve) => {
-      // 1️⃣ insere ou garante o clima do dia
       insertClima.run(
         [
           p.data_hora.slice(0, 10),
@@ -157,14 +169,13 @@ async function inserirPedidos(pedidos) {
           p.temp_max,
           p.temp_min,
           p.precip_sum,
-          p.horas_chuva,
+          null, // horas_chuva não usada
           p.chuva_categoria,
           p.temp_categoria,
         ],
         function (err) {
           if (err) console.error("Erro ao inserir clima:", err.message);
 
-          // 2️⃣ busca o clima_id
           db.get(
             `SELECT id FROM clima WHERE date = ?`,
             [p.data_hora.slice(0, 10)],
@@ -176,7 +187,6 @@ async function inserirPedidos(pedidos) {
 
               const clima_id = row.id;
 
-              // 3️⃣ insere o pedido vinculado
               insertPedido.run(
                 [p.cliente, p.numero_mesa, p.status, p.data_hora, p.total, clima_id],
                 function (err) {
@@ -187,12 +197,17 @@ async function inserirPedidos(pedidos) {
 
                   const pedidoId = this.lastID;
 
-                  // 4️⃣ insere itens do pedido
                   for (const i of p.items) {
-                    insertItem.run([pedidoId, i.product_name, i.option_name, i.quantidade, i.price_unit]);
+                    insertItem.run([
+                      pedidoId,
+                      i.product_name,
+                      i.option_name,
+                      i.quantidade,
+                      i.price_unit,
+                    ]);
                   }
 
-                  resolve(); // continua o loop
+                  resolve();
                 }
               );
             }
@@ -210,6 +225,7 @@ async function inserirPedidos(pedidos) {
     console.log("✅ Inserção concluída com sucesso!");
   });
 }
+
 // ------------------------------------------------------------
 // EXECUÇÃO PRINCIPAL
 // ------------------------------------------------------------

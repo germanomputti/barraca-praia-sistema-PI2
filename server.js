@@ -77,9 +77,14 @@ async function getClimaForDate(dateStr) {
       if (row) return resolve(row);
 
       try {
+
+        // 🔹 Corrige o deslocamento de 1 dia (API Open-Meteo devolve o dia anterior)
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() - 1);
+        const dataCorrigida = d.toISOString().slice(0, 10);
         const lat = -24.00;
         const lon = -46.41;
-        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateStr}&end_date=${dateStr}&daily=temperature_2m_max,temperature_2m_mean,temperature_2m_min,precipitation_sum&hourly=precipitation&timezone=America/Sao_Paulo`;
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dataCorrigida}&end_date=${dataCorrigida}&daily=temperature_2m_max,temperature_2m_mean,temperature_2m_min,precipitation_sum&hourly=precipitation&timezone=America/Sao_Paulo`;
         const resp = await axios.get(url, { timeout: 10000 });
         const daily = resp.data.daily || {};
         const hourly = resp.data.hourly || {};
