@@ -147,7 +147,7 @@ function gerarPedidos(clima) {
 }
 
 // ------------------------------------------------------------
-// 3️⃣ Inserir no banco SQLite
+// 3️⃣ Inserir no banco 
 // ------------------------------------------------------------
 async function inserirPedidos(pedidos) {
   console.log("💾 Inserindo pedidos simulados... modo rápido!");

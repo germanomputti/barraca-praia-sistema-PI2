@@ -6,6 +6,11 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
+app.get("/", (req,res)=>{
+  res.sendFile(path.join(__dirname,"public","index.html"));
+});
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -197,39 +202,49 @@ app.post('/api/pedidos', async (req,res) => {
   try {
     const { cliente='', numero_mesa='', items=[] } = req.body;
     const data_hora = new Date().toISOString();
-    const dateOnly = data_hora.split('T')[0];
+    const dataDia = data_hora.slice(0,10);
 
-    /// pega clima NO SERVER pg
-    const climaRow = await pool.query(
-      "SELECT id FROM clima WHERE date = $1",
-      [dateOnly]
-    );
-    const clima_id = climaRow.rows[0]?.id || null;
+    // clima do dia (já existe porque seed já fez)
+    const clima = await pool.query(`SELECT id FROM clima WHERE date=$1`, [dataDia]);
+    const clima_id = clima.rows[0]?.id || null;
 
-    const total = items.reduce((acc,it) => acc + (it.price_unit||0)*(it.quantidade||1), 0);
-
-    // insere pedido
-    const result = await pool.query(
+    const r = await pool.query(
       `INSERT INTO pedidos(cliente,numero_mesa,status,data_hora,total,clima_id)
-       VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
-      [cliente, numero_mesa, 'Aguardando', data_hora, total, clima_id]
+       VALUES($1,$2,$3,$4,$5,$6)
+       RETURNING id`,
+      [cliente, numero_mesa, "Aguardando", data_hora,
+       items.reduce((acc,i)=>acc+(i.price_unit*i.quantidade),0),
+       clima_id]
     );
 
-    const pedido_id = result.rows[0].id;
+    const pedido_id = r.rows[0].id;
 
     // insere items
     for (const it of items) {
       await pool.query(
         `INSERT INTO pedido_items(pedido_id,product_name,option_name,quantidade,price_unit)
          VALUES($1,$2,$3,$4,$5)`,
-        [pedido_id, it.product_name, it.option_name || '', it.quantidade || 1, it.price_unit || 0]
+        [pedido_id,it.product_name,it.option_name,it.quantidade,it.price_unit]
       );
     }
 
-    res.json({ ok:true, pedido_id });
+    // agora retorna o pedido completo (com items)
+    const respPedido = await pool.query(
+      `SELECT pedidos.*, clima.temp_mean, clima.precip_sum, clima.chuva_categoria, clima.temp_categoria
+       FROM pedidos
+       LEFT JOIN clima ON pedidos.clima_id = clima.id
+       WHERE pedidos.id=$1`,
+      [pedido_id]
+    );
+
+    const pedido = respPedido.rows[0];
+
+    const itensPedido = await pool.query(`SELECT * FROM pedido_items WHERE pedido_id=$1`, [pedido_id]);
+    pedido.items = itensPedido.rows;
+
+    res.json(pedido);
 
   } catch(e) {
-    console.log(e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -272,6 +287,30 @@ app.get('/api/pedidos', async (req,res) => {
 
   } catch(e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ========================================
+// PUT - atualizar status do pedido (produção)
+// ========================================
+app.put("/api/pedidos/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const r = await pool.query(
+      `UPDATE pedidos SET status=$1 WHERE id=$2`,
+      [status, id]
+    );
+
+    if (r.rowCount === 0) {
+      return res.status(404).json({ ok:false, msg:"pedido não encontrado" });
+    }
+
+    res.json({ ok:true });
+
+  } catch (e) {
+    res.status(500).json({ ok:false, msg:e.message });
   }
 });
 
