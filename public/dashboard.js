@@ -55,32 +55,38 @@ async function loadAnalysis() {
     // ========================================================
     // 🔹 Cria seletor de produtos dinamicamente
     // ========================================================
-    const pf = document.getElementById('productFilter');
-    if (!pf) {
-      console.error("❌ Elemento #productFilter não encontrado no DOM!");
-    } else {
-      const produtos = await fetchProductsForAnalysis();
-      console.log("📦 Produtos retornados:", produtos);
+// ========================================================
+// 🔹 Cria seletor de produtos dinamicamente
+// ========================================================
+const pf = document.getElementById('productFilter');
+if (!pf) {
+  console.error("❌ Elemento #productFilter não encontrado no DOM!");
+} else {
 
-      pf.innerHTML = '<option value="__ALL__" selected>Todos os produtos</option>';
+  // pega direto do banco!
+  const produtos = await fetch("/api/products").then(r=>r.json());
+  console.log("📦 Produtos retornados:", produtos);
 
-      const nomesUnicos = [...new Set(produtos.map(p => p.name))].sort();
-      console.log("🧾 Nomes únicos:", nomesUnicos);
+  pf.innerHTML = '<option value="__ALL__" selected>Todos os produtos</option>';
 
-      nomesUnicos.forEach(nome => {
-        const opt = document.createElement('option');
-        opt.value = nome;
-        opt.textContent = nome;
-        pf.appendChild(opt);
-      });
+  // nomes únicos
+  const nomesUnicos = [...new Set(produtos.map(p => p.name))].sort();
+  console.log("🧾 Nomes únicos:", nomesUnicos);
 
-      // 🔹 Atualiza gráficos ao trocar o filtro
-      pf.addEventListener('change', () => {
-        const produtoSelecionado = pf.value;
-        console.log("🎯 Produto selecionado:", produtoSelecionado);
-        renderCharts(pedidos, produtoSelecionado);
-      });
-    }
+  nomesUnicos.forEach(nome => {
+    const opt = document.createElement('option');
+    opt.value = nome;
+    opt.textContent = nome;
+    pf.appendChild(opt);
+  });
+
+  // muda o filtro
+  pf.addEventListener('change', () => {
+    const produtoSelecionado = pf.value;
+    console.log("🎯 Produto selecionado:", produtoSelecionado);
+    renderCharts(pedidos, produtoSelecionado);
+  });
+}
 
     // ========================================================
 // 🔹 Cria seletor de ano dinamicamente

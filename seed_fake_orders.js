@@ -8,15 +8,20 @@
 
 const fs = require("fs");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
+
 const fetch = require("node-fetch");
 
 // Configurações principais
-const dbPath = path.join(__dirname, "db.sqlite");
-const db = new sqlite3.Database(dbPath);
+const { Pool } = require("pg");
+require("dotenv").config();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 const products = JSON.parse(fs.readFileSync(path.join(__dirname, "seed_products.json"), "utf8"));
 
-// Local (exemplo: Praia Grande - SP)
+// Local da barraca: Praia Grande - SP
 const LAT = -24.00;
 const LON = -46.41;
 // sempre começa em 01-01-2024
@@ -145,96 +150,83 @@ function gerarPedidos(clima) {
 // 3️⃣ Inserir no banco SQLite
 // ------------------------------------------------------------
 async function inserirPedidos(pedidos) {
-  console.log("💾 Inserindo pedidos simulados no banco...");
+  console.log("💾 Inserindo pedidos simulados... modo rápido!");
 
-  const insertClima = db.prepare(`
-    INSERT OR IGNORE INTO clima (
-      date, temp_mean, temp_max, temp_min, precip_sum, horas_chuva,
-      chuva_categoria, temp_categoria
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const insertPedido = db.prepare(`
-    INSERT INTO pedidos (
-      cliente, numero_mesa, status, data_hora, total, clima_id
-    ) VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  const insertItem = db.prepare(`
-    INSERT INTO pedido_items (
-      pedido_id, product_name, option_name, quantidade, price_unit
-    ) VALUES (?, ?, ?, ?, ?)
-  `);
-
+  // 1) CLIMA - agrupar por data única
+  const mapaClima = new Map();
   for (const p of pedidos) {
-    await new Promise((resolve) => {
-      insertClima.run(
-        [
-          p.data_hora.slice(0, 10),
-          p.temp_mean,
-          p.temp_max,
-          p.temp_min,
-          p.precip_sum,
-          null, // horas_chuva não usada
-          p.chuva_categoria,
-          p.temp_categoria,
-        ],
-        function (err) {
-          if (err) console.error("Erro ao inserir clima:", err.message);
+    const dia = p.data_hora.slice(0,10);
+    if (!mapaClima.has(dia)) {
+      mapaClima.set(dia, {
+        date: dia,
+        temp_mean: p.temp_mean,
+        temp_max: p.temp_max,
+        temp_min: p.temp_min,
+        precip_sum: p.precip_sum,
+        horas_chuva: p.horas_chuva || 0,
+        chuva_categoria: p.chuva_categoria,
+        temp_categoria: p.temp_categoria
+      });
+    }
+  }
+  const climaList = Array.from(mapaClima.values());
 
-          db.get(
-            `SELECT id FROM clima WHERE date = ?`,
-            [p.data_hora.slice(0, 10)],
-            (err, row) => {
-              if (err || !row) {
-                console.error("Erro ao obter clima_id:", err?.message);
-                return resolve();
-              }
-
-              const clima_id = row.id;
-
-              insertPedido.run(
-                [p.cliente, p.numero_mesa, p.status, p.data_hora, p.total, clima_id],
-                function (err) {
-                  if (err) {
-                    console.error("Erro ao inserir pedido:", err.message);
-                    return resolve();
-                  }
-
-                  const pedidoId = this.lastID;
-
-                  for (const i of p.items) {
-                    insertItem.run([
-                      pedidoId,
-                      i.product_name,
-                      i.option_name,
-                      i.quantidade,
-                      i.price_unit,
-                    ]);
-                  }
-
-                  resolve();
-                }
-              );
-            }
-          );
-        }
-      );
-    });
+  console.log("   -> inserindo clima em bulk…");
+  for (const c of climaList) {
+    await pool.query(
+      `INSERT INTO clima(date,temp_mean,temp_max,temp_min,precip_sum,horas_chuva,chuva_categoria,temp_categoria)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT (date) DO NOTHING`,
+      [c.date,c.temp_mean,c.temp_max,c.temp_min,c.precip_sum,c.horas_chuva,c.chuva_categoria,c.temp_categoria]
+    );
   }
 
-  insertClima.finalize();
-  insertPedido.finalize();
-  insertItem.finalize();
+  // 2) pedidos em chunks
+  const chunk = 1000;
+  for (let i=0; i<pedidos.length; i+=chunk) {
+    const fatia = pedidos.slice(i, i+chunk);
 
-  db.close(() => {
-    console.log("✅ Inserção concluída com sucesso!");
-  });
+    const insertPedidosSQL = `
+      INSERT INTO pedidos(cliente,numero_mesa,status,data_hora,total,clima_id)
+      VALUES ${fatia.map((_,idx)=>`($${idx*6+1},$${idx*6+2},$${idx*6+3},$${idx*6+4},$${idx*6+5},(SELECT id FROM clima WHERE date=$${idx*6+6}))`).join(",")}
+      RETURNING id
+    `;
+
+    const params = [];
+    for (const p of fatia) {
+      params.push(p.cliente,p.numero_mesa,"Concluído",p.data_hora,p.total,p.data_hora.slice(0,10));
+    }
+
+    const resPedidos = await pool.query(insertPedidosSQL,params);
+
+    // 3) now insert items for this chunk
+    let valuesItems = [];
+    let paramsItems = [];
+    let k = 1;
+
+    for (let idx=0; idx<fatia.length; idx++) {
+      const pedidoId = resPedidos.rows[idx].id;
+      for (const it of fatia[idx].items) {
+        valuesItems.push(`($${k},$${k+1},$${k+2},$${k+3},$${k+4})`);
+        paramsItems.push(pedidoId,it.product_name,it.option_name,it.quantidade,it.price_unit);
+        k+=5;
+      }
+    }
+    if (valuesItems.length>0){
+      await pool.query(
+        `INSERT INTO pedido_items(pedido_id,product_name,option_name,quantidade,price_unit)
+         VALUES ${valuesItems.join(",")}`,
+        paramsItems
+      );
+    }
+  }
+  console.log("✅ tudo inserido (Postgres bulk)");
 }
-
 // ------------------------------------------------------------
 // EXECUÇÃO PRINCIPAL
 // ------------------------------------------------------------
+
+
 (async () => {
   try {
     const clima = await getClimateData();

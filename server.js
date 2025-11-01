@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+
 const axios = require('axios');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -13,51 +13,68 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const db = new sqlite3.Database('./db.sqlite');
+const { Pool } = require('pg');
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    option_name TEXT,
-    price REAL,
-    image TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS clima (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT UNIQUE,
-    temp_mean REAL,
-    temp_max REAL,
-    temp_min REAL,
-    precip_sum REAL,
-    horas_chuva INTEGER,
-    chuva_categoria TEXT,
-    temp_categoria TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS pedidos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cliente TEXT,
-    numero_mesa TEXT,
-    status TEXT,
-    data_hora TEXT,
-    total REAL,
-    clima_id INTEGER,
-    FOREIGN KEY(clima_id) REFERENCES clima(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS pedido_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    pedido_id INTEGER,
-    product_name TEXT,
-    option_name TEXT,
-    quantidade INTEGER,
-    price_unit REAL,
-    FOREIGN KEY(pedido_id) REFERENCES pedidos(id)
-  )`);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
+// =====================================
+// CRIAÇÃO DAS TABELAS (postgres)
+// =====================================
 
+async function initTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      option_name TEXT,
+      price REAL,
+      image TEXT
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clima (
+      id SERIAL PRIMARY KEY,
+      date DATE UNIQUE,
+      temp_mean REAL,
+      temp_max REAL,
+      temp_min REAL,
+      precip_sum REAL,
+      horas_chuva INTEGER,
+      chuva_categoria TEXT,
+      temp_categoria TEXT
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pedidos (
+      id SERIAL PRIMARY KEY,
+      cliente TEXT,
+      numero_mesa TEXT,
+      status TEXT,
+      data_hora TIMESTAMP,
+      total REAL,
+      clima_id INTEGER REFERENCES clima(id)
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pedido_items (
+      id SERIAL PRIMARY KEY,
+      pedido_id INTEGER REFERENCES pedidos(id),
+      product_name TEXT,
+      option_name TEXT,
+      quantidade INTEGER,
+      price_unit REAL
+    );
+  `);
+
+  console.log("✅ Tabelas Postgres verificadas/criadas");
+}
+
+initTables();
 function classificarChuvaPorMm(mm) {
   if (mm === null || mm === undefined) return null;
   if (mm <= 2.4) return "Sem/Muito fraca";
@@ -72,47 +89,49 @@ function classificarTempMax(t) {
 }
 
 async function getClimaForDate(dateStr) {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM clima WHERE date = ?', [dateStr], async (err, row) => {
-      if (err) return reject(err);
-      if (row) return resolve(row);
+  // verifica se já existe no banco
+  const existing = await pool.query("SELECT * FROM clima WHERE date = $1", [dateStr]);
+  if (existing.rows.length > 0) return existing.rows[0];
 
-      try {
+  // corrige deslocamento
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() - 1);
+  const dataCorrigida = d.toISOString().slice(0, 10);
 
-        // 🔹 Corrige o deslocamento de 1 dia (API Open-Meteo devolve o dia anterior)
-        const d = new Date(dateStr);
-        d.setDate(d.getDate() - 1);
-        const dataCorrigida = d.toISOString().slice(0, 10);
-        const lat = -24.00;
-        const lon = -46.41;
-        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dataCorrigida}&end_date=${dataCorrigida}&daily=temperature_2m_max,temperature_2m_mean,temperature_2m_min,precipitation_sum&hourly=precipitation&timezone=America/Sao_Paulo`;
-        const resp = await axios.get(url, { timeout: 10000 });
-        const daily = resp.data.daily || {};
-        const hourly = resp.data.hourly || {};
-        const temp_mean = daily.temperature_2m_mean ? daily.temperature_2m_mean[0] : null;
-        const temp_max  = daily.temperature_2m_max ? daily.temperature_2m_max[0] : null;
-        const temp_min  = daily.temperature_2m_min ? daily.temperature_2m_min[0] : null;
-        const precip_sum = daily.precipitation_sum ? daily.precipitation_sum[0] : 0;
-        let horas_chuva = 0;
-        if (hourly && hourly.precipitation && Array.isArray(hourly.precipitation)) {
-          horas_chuva = hourly.precipitation.reduce((acc,v) => acc + (v>0?1:0), 0);
-        }
-        const chuva_categoria = classificarChuvaPorMm(precip_sum);
-        const temp_categoria = classificarTempMax(temp_max);
+  const lat = -24.00;
+  const lon = -46.41;
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dataCorrigida}&end_date=${dataCorrigida}&daily=temperature_2m_max,temperature_2m_mean,temperature_2m_min,precipitation_sum&hourly=precipitation&timezone=America/Sao_Paulo`;
 
-        db.run(`INSERT INTO clima (date,temp_mean,temp_max,temp_min,precip_sum,horas_chuva,chuva_categoria,temp_categoria)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [dateStr, temp_mean, temp_max, temp_min, precip_sum, horas_chuva, chuva_categoria, temp_categoria], function(err2){
-          if (err2) return reject(err2);
-          db.get('SELECT * FROM clima WHERE id = ?', [this.lastID], (e,r) => {
-            if (e) return reject(e);
-            resolve(r);
-          });
-        });
-      } catch (e) {
-        resolve(null);
-      }
-    });
-  });
+  try {
+    const resp = await axios.get(url, { timeout: 10000 });
+    const daily = resp.data.daily || {};
+    const hourly = resp.data.hourly || {};
+
+    const temp_mean = daily.temperature_2m_mean ? daily.temperature_2m_mean[0] : null;
+    const temp_max  = daily.temperature_2m_max ? daily.temperature_2m_max[0] : null;
+    const temp_min  = daily.temperature_2m_min ? daily.temperature_2m_min[0] : null;
+    const precip_sum = daily.precipitation_sum ? daily.precipitation_sum[0] : 0;
+
+    let horas_chuva = 0;
+    if (hourly && hourly.precipitation && Array.isArray(hourly.precipitation)) {
+      horas_chuva = hourly.precipitation.reduce((acc, v) => acc + (v > 0 ? 1 : 0), 0);
+    }
+
+    const chuva_categoria = classificarChuvaPorMm(precip_sum);
+    const temp_categoria = classificarTempMax(temp_max);
+
+    // INSERE NO POSTGRES
+    const inserted = await pool.query(`
+      INSERT INTO clima(date,temp_mean,temp_max,temp_min,precip_sum,horas_chuva,chuva_categoria,temp_categoria)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING *
+    `, [dateStr, temp_mean, temp_max, temp_min, precip_sum, horas_chuva, chuva_categoria, temp_categoria]);
+
+    return inserted.rows[0];
+  } catch (e) {
+    console.error("Erro clima:", e.message);
+    return null;
+  }
 }
 
 app.get('/api/clima/:date', async (req,res) => {
@@ -126,18 +145,52 @@ app.get('/api/clima/:date', async (req,res) => {
   }
 });
 
-app.get('/api/products', (req,res) => {
-  db.all('SELECT * FROM products', [], (err,rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
+app.get('/api/products', async (req,res) => {
+  try {
+    const result = await pool.query("SELECT * FROM products ORDER BY name ASC");
+    res.json(result.rows);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.post('/api/seed-products', (req,res) => {
-  const products = req.body.products || [];
-  const stmt = db.prepare('INSERT INTO products (name, option_name, price, image) VALUES (?, ?, ?, ?)');
-  for (const p of products) stmt.run([p.name, p.option_name, p.price, p.image]);
-  stmt.finalize(() => res.json({ ok:true }));
+app.post('/api/seed-only-products', async (req, res) => {
+  try {
+    const data = req.body.products;
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({error: "envie {products:[...]} no body"});
+    }
+
+    // limpa products antes
+    await pool.query(`DELETE FROM products`);
+
+    for (const p of data) {
+      await pool.query(
+        `INSERT INTO products(name, option_name, price, image)
+         VALUES($1,$2,$3,$4)`,
+        [p.name, p.option_name, p.price, p.image]
+      );
+    }
+
+    res.json({ok:true, inserted:data.length});
+  } catch(e) {
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post('/api/seed-products', async (req,res) => {
+  try {
+    const products = req.body.products || [];
+    for (const p of products) {
+      await pool.query(
+        "INSERT INTO products(name, option_name, price, image) VALUES($1,$2,$3,$4)",
+        [p.name, p.option_name, p.price, p.image]
+      );
+    }
+    res.json({ ok:true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/pedidos', async (req,res) => {
@@ -145,62 +198,81 @@ app.post('/api/pedidos', async (req,res) => {
     const { cliente='', numero_mesa='', items=[] } = req.body;
     const data_hora = new Date().toISOString();
     const dateOnly = data_hora.split('T')[0];
-      send("🌦️ Gerando histórico completo de clima 2024 → ontem...");
-  await gerarHistoricoCompleto();
-  send("✅ Clima de 2024 até ontem gerado!");
-    const clima_id = clima ? clima.id : null;
+
+    /// pega clima NO SERVER pg
+    const climaRow = await pool.query(
+      "SELECT id FROM clima WHERE date = $1",
+      [dateOnly]
+    );
+    const clima_id = climaRow.rows[0]?.id || null;
+
     const total = items.reduce((acc,it) => acc + (it.price_unit||0)*(it.quantidade||1), 0);
-    db.run('INSERT INTO pedidos (cliente, numero_mesa, status, data_hora, total, clima_id) VALUES (?, ?, ?, ?, ?, ?)', [cliente, numero_mesa, 'Aguardando', data_hora, total, clima_id], function(err){
-      if (err) return res.status(500).json({ error: err.message });
-      const pedido_id = this.lastID;
-      const stmt = db.prepare('INSERT INTO pedido_items (pedido_id, product_name, option_name, quantidade, price_unit) VALUES (?, ?, ?, ?, ?)');
-      for (const it of items) {
-        stmt.run([pedido_id, it.product_name, it.option_name || '', it.quantidade || 1, it.price_unit || 0]);
-      }
-      stmt.finalize(() => {
-        db.get('SELECT * FROM pedidos WHERE id = ?', [pedido_id], (e,pedidoRow) => {
-          db.all('SELECT * FROM pedido_items WHERE pedido_id = ?', [pedido_id], (ee,itemRows) => {
-            pedidoRow.items = itemRows;
-            res.json(pedidoRow);
-          });
-        });
-      });
-    });
+
+    // insere pedido
+    const result = await pool.query(
+      `INSERT INTO pedidos(cliente,numero_mesa,status,data_hora,total,clima_id)
+       VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [cliente, numero_mesa, 'Aguardando', data_hora, total, clima_id]
+    );
+
+    const pedido_id = result.rows[0].id;
+
+    // insere items
+    for (const it of items) {
+      await pool.query(
+        `INSERT INTO pedido_items(pedido_id,product_name,option_name,quantidade,price_unit)
+         VALUES($1,$2,$3,$4,$5)`,
+        [pedido_id, it.product_name, it.option_name || '', it.quantidade || 1, it.price_unit || 0]
+      );
+    }
+
+    res.json({ ok:true, pedido_id });
+
   } catch(e) {
+    console.log(e);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.get('/api/pedidos', (req,res) => {
-  const date = req.query.date; // optional
-  let sql = 'SELECT pedidos.*, clima.temp_mean, clima.precip_sum, clima.chuva_categoria, clima.temp_categoria FROM pedidos LEFT JOIN clima ON pedidos.clima_id = clima.id';
-  const params = [];
-  if (date) {
-    sql += ' WHERE date(data_hora) = ?';
-    params.push(date);
-  }
-  sql += ' ORDER BY data_hora DESC';
-  db.all(sql, params, (err,rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    const ids = rows.map(r=>r.id);
-    if (ids.length===0) return res.json([]);
-    db.all(`SELECT * FROM pedido_items WHERE pedido_id IN (${ids.join(',')})`, [], (e,items) => {
-      if (e) return res.status(500).json({ error: e.message });
-      const map={};
-      items.forEach(it => { map[it.pedido_id]=map[it.pedido_id]||[]; map[it.pedido_id].push(it); });
-      rows.forEach(r => r.items = map[r.id] || []);
-      res.json(rows);
-    });
-  });
-});
+app.get('/api/pedidos', async (req,res) => {
+  try {
+    const date = req.query.date;
+    let sql = `
+      SELECT pedidos.*, clima.temp_mean, clima.precip_sum, clima.chuva_categoria, clima.temp_categoria
+      FROM pedidos
+      LEFT JOIN clima ON pedidos.clima_id = clima.id
+    `;
+    const params = [];
+    if (date) {
+      sql += ` WHERE DATE(data_hora) = $1`;
+      params.push(date);
+    }
+    sql += ` ORDER BY data_hora DESC`;
 
-app.put('/api/pedidos/:id/status', (req,res) => {
-  const id = req.params.id;
-  const { status } = req.body;
-  db.run('UPDATE pedidos SET status = ? WHERE id = ?', [status, id], function(err){
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ updated: this.changes });
-  });
+    const result = await pool.query(sql, params);
+    const rows = result.rows;
+
+    if (!rows.length) return res.json([]);
+
+    const ids = rows.map(r=>r.id);
+    const items = await pool.query(
+      `SELECT * FROM pedido_items WHERE pedido_id = ANY($1)`,
+      [ids]
+    );
+
+    const map = {};
+    items.rows.forEach(it => {
+      map[it.pedido_id] = map[it.pedido_id] || [];
+      map[it.pedido_id].push(it);
+    });
+
+    rows.forEach(r => r.items = map[r.id] || []);
+
+    res.json(rows);
+
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // export app for tests if needed
@@ -215,20 +287,20 @@ if (require.main === module) {
 // ========================================
 // ROTAS ADMIN
 // ========================================
-app.post('/admin/clear-db', (req, res) => {
+app.post('/admin/clear-db', async (req, res) => {
   const pin = req.body.pin;
   if (pin !== process.env.ADMIN_PIN) {
     return res.status(401).json({ ok: false, msg: 'PIN incorreto' });
   }
 
-  db.serialize(() => {
-    db.run("DELETE FROM pedido_items");
-    db.run("DELETE FROM pedidos");
-    db.run("DELETE FROM clima");
-    db.run("VACUUM");
-  });
-
-  res.json({ ok: true, msg: "Banco limpo com sucesso" });
+  try {
+    await pool.query("DELETE FROM pedido_items");
+    await pool.query("DELETE FROM pedidos");
+    await pool.query("DELETE FROM clima");
+    res.json({ ok:true, msg:"Banco limpo com sucesso" });
+  } catch(e) {
+    res.status(500).json({ error:e.message });
+  }
 });
 
 const { execFile } = require("child_process");
