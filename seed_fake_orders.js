@@ -19,7 +19,13 @@ const products = JSON.parse(fs.readFileSync(path.join(__dirname, "seed_products.
 // Local (exemplo: Praia Grande - SP)
 const LAT = -24.00;
 const LON = -46.41;
-const ANO = 2024; // ajuste se quiser outro
+// sempre começa em 01-01-2024
+const START_DATE = "2024-01-01";
+
+// data final = ontem
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  const END_DATE = ontem.toISOString().slice(0,10);
 
 // Funções auxiliares
 function randomInt(min, max) {
@@ -45,8 +51,8 @@ function classifyTemp(temp) {
 // 1️⃣ Obter dados de clima da API Open-Meteo (fuso corrigido)
 // ------------------------------------------------------------
 async function getClimateData() {
-  const start = `${ANO}-01-01`;
-  const end = `${ANO}-12-31`;
+  const start = START_DATE;
+  const end = END_DATE;
 
   // ✅ CORRIGIDO: adiciona timezone local para evitar "avanço de dia"
   const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${start}&end_date=${end}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum&timezone=America/Sao_Paulo`;
