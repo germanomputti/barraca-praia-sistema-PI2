@@ -4,7 +4,17 @@
   --container-width:1100px;
 }
 *{box-sizing:border-box}
-body{font-family:Inter, Arial, sans-serif; background:linear-gradient(180deg,var(--bg),#fff); color:#222; margin:0; padding:16px; display:flex; justify-content:center;}
+body{
+  font-family:Inter, Arial, sans-serif;
+  font-size:18px;            /* ← aumentado para facilitar leitura */
+  line-height:1.45;          /* ← deixa o texto respirar mais */
+  background:linear-gradient(180deg,var(--bg),#fff);
+  color:#222;
+  margin:0;
+  padding:17px;
+  display:flex;
+  justify-content:center;
+}
 .header{max-width:var(--container-width); width:100%; margin-bottom:12px; padding:12px; border-radius:8px; background:linear-gradient(90deg,var(--primary),var(--secondary)); color:white; box-shadow:0 4px 10px rgba(0,0,0,0.08);}
 .main-grid{max-width:var(--container-width); width:100%; display:grid; grid-template-columns:1fr 360px; gap:16px;}
 .products-grid{display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:12px;}
@@ -361,3 +371,132 @@ header {
 .hover-popup-detalhe h4 { color: #023E8A; font-size: 14px; margin:0; }
 .hover-popup-detalhe ul { margin:6px 0 0 0; padding-left:14px; }
 .hover-popup-detalhe li { margin:4px 0; }
+
+
+/* ============================
+   MODO ALTO CONTRASTE
+   ============================ */
+body.alto-contraste {
+  background:#000 !important;
+  color:#fff !important;
+}
+
+body.alto-contraste button {
+  background:#000 !important;
+  color:#fff !important;
+  border:2px solid #fff !important;
+}
+
+body.alto-contraste table {
+  color:#fff !important;
+}
+
+body.alto-contraste td, body.alto-contraste th {
+  border-color:#fff !important;
+}
+
+body.alto-contraste .item-card,
+body.alto-contraste .cart,
+body.alto-contraste .card {
+  background:#000 !important;
+  color:#fff !important;
+  border:2px solid #fff !important;
+}
+
+body.alto-contraste input,
+body.alto-contraste select {
+  background:#000 !important;
+  color:#fff !important;
+  border:2px solid #fff !important;
+}
+
+body.alto-contraste a {
+  color:#0ff !important;
+  text-decoration:underline;
+}
+
+/* === Alto contraste para o POPUP de pedido === */
+body.alto-contraste #modal.modal {
+  /* fundo do overlay mais claro, para não “apagar” o conteúdo */
+  background: rgba(255,255,255,0.2) !important;
+}
+
+body.alto-contraste #modal .modal-content,
+body.alto-contraste #modal .pedido-confirmado {
+  background: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+  box-shadow: none !important;
+}
+
+/* garante que todos os textos dentro do modal fiquem brancos */
+body.alto-contraste #modal .modal-content h1,
+body.alto-contraste #modal .modal-content h2,
+body.alto-contraste #modal .modal-content h3,
+body.alto-contraste #modal .modal-content p,
+body.alto-contraste #modal .modal-content ul,
+body.alto-contraste #modal .modal-content li,
+body.alto-contraste #modal .modal-content strong,
+body.alto-contraste #modal .modal-content span {
+  color: #fff !important;
+}
+
+/* botões dentro do modal: fundo branco, texto preto para contraste */
+body.alto-contraste #modal .modal-content .btn,
+body.alto-contraste #modal .modal-content .btn.alt,
+body.alto-contraste #modal .modal-content .btn.danger {
+  background: #fff !important;
+  color: #000 !important;
+  border: 2px solid #fff !important;
+  box-shadow: none !important;
+}
+
+/* links (se houver) */
+body.alto-contraste #modal .modal-content a {
+  color: #0ff !important;
+  text-decoration: underline !important;
+}
+
+
+
+/* === acessibilidade: botões maiores === */
+button,
+.btn {
+  font-size: 20px !important;
+  padding: 12px 18px !important;
+}
+
+/* === acessibilidade: selects maiores === */
+select {
+  font-size: 20px !important;
+  padding: 12px 16px !important;
+  min-height: 50px !important;
+}
+
+select option {
+  font-size: 20px !important;
+}
+
+/* inputs maiores: nome do cliente e número da mesa */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input:not([type]),
+textarea {
+  font-size: 20px !important;
+  padding: 12px 16px !important;
+}
+
+/* Fonte grande global */
+body.fonte-grande {
+  font-size: 28px !important;
+}
+
+body.fonte-grande button,
+body.fonte-grande select,
+body.fonte-grande input,
+body.fonte-grande th,
+body.fonte-grande td,
+body.fonte-grande option {
+  font-size: 22px !important;
+}

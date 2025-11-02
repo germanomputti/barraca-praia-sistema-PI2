@@ -433,3 +433,33 @@ function resetHiddenOrders() {
   loadProduction();
   alert("🔁 Todos os pedidos foram restaurados na visualização!");
 }
+
+// ========================
+// ACESSIBILIDADE
+// ========================
+
+// ---- Alto contraste ----
+document.getElementById("contrastToggle")?.addEventListener("click", ()=>{
+  const body = document.body;
+  const btn = document.getElementById("contrastToggle");
+
+  body.classList.toggle("alto-contraste");
+
+  // muda o texto do botão
+  if(body.classList.contains("alto-contraste")){
+    btn.textContent = "Modo normal";
+  } else {
+    btn.textContent = "Alto contraste";
+  }
+});
+
+// ---- Tamanho da fonte ----
+const fontBtn = document.getElementById("fontSizeToggle");
+if (fontBtn) {
+  fontBtn.addEventListener("click", ()=>{
+    document.body.classList.toggle("fonte-grande");
+    fontBtn.textContent = document.body.classList.contains("fonte-grande")
+      ? "Reduzir fonte"
+      : "Aumentar fonte";
+  });
+}
