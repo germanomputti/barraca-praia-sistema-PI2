@@ -11,6 +11,7 @@
   <button id="fontSizeToggle" class="btn alt">Aumentar fonte</button>
 </div>
 <body>
+  <div id="sr-announce" aria-live="assertive" style="position:absolute; left:-9999px; top:-9999px;"></div>
   <header class="header"><h1>Barraca de Praia - Cardápio</h1></header>
   <main class="main-grid">
     <section class="menu" aria-label="Produtos">
@@ -31,7 +32,6 @@
 
   <div id="modal" class="modal" role="dialog" aria-modal="true" hidden>
     <div class="modal-content" id="modalContent"></div>
-    <button id="closeModal" class="btn">Fechar</button>
   </div>
 
 <script src="script.js"></script>

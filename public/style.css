@@ -414,6 +414,25 @@ body.alto-contraste a {
   color:#0ff !important;
   text-decoration:underline;
 }
+/* ===== ALTO CONTRASTE: Header + Título (cardápio e análise) ===== */
+body.alto-contraste header,
+body.alto-contraste .header {
+  background-image: none !important;   /* mata o gradiente */
+  background: #000 !important;
+  color: #fff !important;
+  border-bottom: 2px solid #fff !important; /* se existir borda, fica branca */
+}
+
+/* h1 dentro do header (cardápio usa .header h1; análise usa header .titulo-analise) */
+body.alto-contraste .header h1,
+body.alto-contraste header h1,
+body.alto-contraste header .titulo-analise {
+  color: #fff !important;
+  /* garante “linha” branca, mesmo se o original não tiver border */
+  border-bottom: 2px solid #fff !important;
+  display: inline-block !important;
+  padding-bottom: 8px;                  /* igual à análise */
+}
 
 /* === Alto contraste para o POPUP de pedido === */
 body.alto-contraste #modal.modal {
@@ -499,4 +518,11 @@ body.fonte-grande th,
 body.fonte-grande td,
 body.fonte-grande option {
   font-size: 22px !important;
+}
+
+
+/* foco teclado claro e visível */
+:focus {
+  outline: 3px solid #00f !important;
+  outline-offset: 3px;
 }

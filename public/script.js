@@ -43,7 +43,8 @@ async function renderProductsGrid() {
     let img = opts[0].image;
       if (img && img.endsWith('.svg')) img = img.replace('.svg', '.jpg');
     const card = document.createElement('div');
-    card.className = 'item-card';
+card.className = 'item-card';
+card.setAttribute("tabindex","0");
     card.innerHTML = `<img src="${img}" alt="${name}"><h3>${name}</h3>`;
 
     const select = document.createElement('select');
@@ -55,31 +56,49 @@ async function renderProductsGrid() {
     });
     card.appendChild(select);
 
-    // controle de quantidade
-    const qdiv = document.createElement('div');
-    qdiv.className = 'quant';
-    const minus = document.createElement('button');
-    minus.textContent = '-';
-    const qty = document.createElement('span');
-    qty.textContent = '1';
-    const plus = document.createElement('button');
-    plus.textContent = '+';
-    minus.onclick = () => { let n = +qty.textContent; if (n > 1) qty.textContent = n - 1; };
-    plus.onclick = () => { let n = +qty.textContent; qty.textContent = n + 1; };
-    qdiv.append(minus, qty, plus);
-    card.appendChild(qdiv);
+// controle de quantidade
+const qdiv = document.createElement('div');
+qdiv.className = 'quant';
+const minus = document.createElement('button');
+minus.textContent = '-';
+const qty = document.createElement('span');
+qty.textContent = '1';
+const plus = document.createElement('button');
+plus.textContent = '+';
 
-    // botão adicionar
-    const add = document.createElement('button');
-    add.className = 'btn alt';
-    add.textContent = 'Adicionar';
-    add.onclick = () => {
-      const sel = JSON.parse(select.value);
-      addToCart(name, sel.option, sel.price, +qty.textContent);
-      add.textContent = '✅ Adicionado!';
-      setTimeout(() => (add.textContent = 'Adicionar'), 1000);
-    };
-    card.appendChild(add);
+function activateOnEnterSpace(btn, fn) {
+  btn.addEventListener("click", fn);
+  btn.addEventListener("keydown", (ev)=>{
+    if(ev.key==="Enter" || ev.key===" "){
+      ev.preventDefault();
+      fn();
+    }
+  });
+}
+
+minus.setAttribute("tabindex","0");
+plus.setAttribute("tabindex","0");
+
+activateOnEnterSpace(minus, ()=>{ let n = +qty.textContent; if (n>1) qty.textContent = n-1; });
+activateOnEnterSpace(plus, ()=>{ let n = +qty.textContent; qty.textContent = n+1; });
+
+qdiv.append(minus, qty, plus);
+card.appendChild(qdiv);
+
+// botão adicionar
+const add = document.createElement('button');
+add.className = 'btn alt';
+add.textContent = 'Adicionar';
+add.setAttribute("tabindex","0");
+
+activateOnEnterSpace(add, ()=>{
+  const sel = JSON.parse(select.value);
+  addToCart(name, sel.option, sel.price, +qty.textContent);
+  add.textContent = '✅ Adicionado!';
+  setTimeout(() => (add.textContent = 'Adicionar'), 1000);
+});
+
+card.appendChild(add);
     grid.appendChild(card);
   });
 }
@@ -96,10 +115,21 @@ function renderCart() {
   list.innerHTML = '';
   let total = 0;
   cart.forEach((it, idx) => {
-    const li = document.createElement('li');
-    li.innerHTML = `${it.product_name} (${it.option_name}) x${it.quantidade} - R$ ${formatMoney(it.price_unit * it.quantidade)}
-      <button class="btn" onclick="removeFromCart(${idx})">❌</button>`;
-    list.appendChild(li);
+   const li = document.createElement('li');
+li.innerHTML = `${it.product_name} (${it.option_name}) x${it.quantidade} - R$ ${formatMoney(it.price_unit * it.quantidade)}`;
+const del = document.createElement('button');
+del.className = 'btn';
+del.textContent = '❌';
+del.setAttribute("tabindex","0");
+del.addEventListener("click", ()=> removeFromCart(idx));
+del.addEventListener("keydown", (ev)=>{
+  if(ev.key==="Enter" || ev.key===" ") {
+    ev.preventDefault();
+    removeFromCart(idx);
+  }
+});
+li.appendChild(del);
+list.appendChild(li);
     total += it.price_unit * it.quantidade;
   });
   totalEl.textContent = formatMoney(total);
@@ -110,7 +140,7 @@ function removeFromCart(i) {
   renderCart();
 }
 
-async function sendOrder() {
+async function submitOrder() {
   const cliente = document.getElementById('cliente').value.trim();
   const mesa = document.getElementById('numero-mesa').value.trim();
 
@@ -153,6 +183,7 @@ async function sendOrder() {
 function showModalPedido(p) {
   const modal = document.getElementById('modal');
   const content = document.getElementById('modalContent');
+
   content.innerHTML = `
     <div class="pedido-confirmado">
       <h2>🎉 Pedido enviado!</h2>
@@ -162,13 +193,42 @@ function showModalPedido(p) {
       <p><strong>Data:</strong> ${new Date(p.data_hora).toLocaleString('pt-BR')}</p>
       <ul>${p.items.map(i => `<li>${i.product_name} (${i.option_name}) x${i.quantidade}</li>`).join('')}</ul>
       <button class="btn alt" id="novoPedido">Novo Pedido</button>
+      <button class="btn danger" id="closeModal">Fechar</button>
     </div>`;
+
   modal.style.display = 'flex';
-  document.getElementById('novoPedido').onclick = () => {
+
+  // anúncio voz para leitores de tela
+  const sr = document.getElementById("sr-announce");
+  if (sr) sr.textContent = `Pedido enviado com sucesso para o cliente ${p.cliente}.`;
+
+  // pega os dois botões
+  const novoBtn = document.getElementById('novoPedido');
+  const closeBtn = document.getElementById('closeModal');
+
+  // ações click normais
+  novoBtn.onclick = () => {
     modal.style.display = 'none';
     document.getElementById('cliente').value = '';
     document.getElementById('numero-mesa').value = '';
   };
+  closeBtn.onclick = () => {
+    modal.style.display = 'none';
+  };
+
+  // torna os botões acessíveis pelo teclado
+  [novoBtn, closeBtn].forEach(btn=>{
+    btn.setAttribute("tabindex","0");
+    btn.addEventListener("keydown", (ev)=>{
+      if(ev.key==="Enter" || ev.key===" ") {
+        ev.preventDefault();
+        btn.click();
+      }
+    });
+  });
+
+  // foco automático no botão principal ao abrir o modal
+  novoBtn.focus();
 }
 // --------------------------------------------------
 // TELA DE PRODUÇÃO (com filtro e persistência local)
@@ -397,7 +457,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (location.pathname.includes('index.html') || location.pathname === '/' || location.pathname === '/public/') {
     await renderProductsGrid();
     renderCart();
-    document.getElementById('sendOrder')?.addEventListener('click', sendOrder);
+    const sendOrderBtn = document.getElementById('sendOrder');
+if (sendOrderBtn) {
+  // clique do mouse
+  sendOrderBtn.addEventListener('click', submitOrder);
+
+  // acessível teclado
+  sendOrderBtn.setAttribute("tabindex","0");
+  sendOrderBtn.addEventListener("keydown",(ev)=>{
+    if (ev.key==="Enter" || ev.key===" ") {
+      ev.preventDefault();
+      submitOrder();
+    }
+  });
+}
   }
 
   if (location.pathname.includes('producao.html')) {
@@ -463,3 +536,14 @@ if (fontBtn) {
       : "Aumentar fonte";
   });
 }
+
+// ===== Fechar modal com ESC =====
+document.addEventListener('keydown', (e)=>{
+  if(e.key === "Escape"){
+    const m = document.getElementById("modal");
+    if(m && m.style.display==='flex'){
+      m.style.display='none';
+      m.hidden = true;
+    }
+  }
+});
